@@ -1,5 +1,6 @@
 package com.extrabox.periodization.entity
 
+import com.extrabox.periodization.enums.PlanStatus
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
@@ -46,6 +47,10 @@ class TrainingPlan {
     @Column(name = "excel_file_path", nullable = false)
     var excelFilePath: String = ""
 
+    @Column(name = "status", nullable = false)
+    @Enumerated(EnumType.STRING)
+    var status: PlanStatus = PlanStatus.PAYMENT_PENDING
+
     @Column(name = "created_at", nullable = false)
     var createdAt: LocalDateTime = LocalDateTime.now()
 
@@ -69,6 +74,7 @@ class TrainingPlan {
         planDuration: Int,
         planContent: String,
         excelFilePath: String,
+        status: PlanStatus,
         createdAt: LocalDateTime = LocalDateTime.now(),
         user: User? = null
     ) {
@@ -85,6 +91,7 @@ class TrainingPlan {
         this.planDuration = planDuration
         this.planContent = planContent
         this.excelFilePath = excelFilePath
+        this.status = status
         this.createdAt = createdAt
         this.user = user
     }

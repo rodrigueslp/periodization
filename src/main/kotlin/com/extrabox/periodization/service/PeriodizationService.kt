@@ -1,8 +1,10 @@
 package com.extrabox.periodization.service
 
 import com.extrabox.periodization.entity.BenchmarkData
+import com.extrabox.periodization.enums.PlanStatus
 import com.extrabox.periodization.entity.TrainingPlan
 import com.extrabox.periodization.model.AthleteData
+import com.extrabox.periodization.model.Benchmarks
 import com.extrabox.periodization.model.PlanDetailsResponse
 import com.extrabox.periodization.model.PlanRequest
 import com.extrabox.periodization.model.PlanResponse
@@ -28,29 +30,18 @@ class PeriodizationService(
     private val userRepository: UserRepository
 ) {
 
+    /**
+     * Cria um novo plano sem conteúdo, apenas com os dados básicos do atleta e status PAYMENT_PENDING
+     */
     @Transactional
-    fun generatePlan(request: PlanRequest, userEmail: String): PlanResponse {
+    fun createPendingPlan(request: PlanRequest, userEmail: String): PlanResponse {
         // Verificar se o usuário existe
         val user = userRepository.findByEmail(userEmail)
             .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
 
-        // Verificar se o usuário tem uma assinatura ativa ou é administrador
-        val hasActiveSubscription = user.subscriptionExpiry?.isAfter(LocalDateTime.now()) ?: false
-
-        if (!hasActiveSubscription && !user.roles.any { it.name == "ROLE_ADMIN" }) {
-            throw AccessDeniedException("É necessário um pagamento para gerar planos de treinamento")
-        }
-
         val planId = UUID.randomUUID().toString()
-        val planContent = anthropicService.generateTrainingPlan(request.athleteData, request.planDuration)
 
-        // Criar planilha Excel a partir do conteúdo do plano
-        val excelData = createExcelWorkbook(request.athleteData, planContent)
-
-        // Salvar o arquivo Excel e obter o caminho
-        val excelFilePath = fileStorageService.saveFile(planId, excelData)
-
-        // Persistir no banco de dados
+        // Criar plano pendente de pagamento
         val trainingPlan = TrainingPlan(
             planId = planId,
             athleteName = request.athleteData.nome,
@@ -63,9 +54,10 @@ class PeriodizationService(
             injuries = request.athleteData.lesoes,
             trainingHistory = request.athleteData.historico,
             planDuration = request.planDuration,
-            planContent = planContent,
-            excelFilePath = excelFilePath,
-            user = user
+            planContent = "", // Vazio até ser gerado
+            excelFilePath = "", // Vazio até ser gerado
+            user = user,
+            status = PlanStatus.PAYMENT_PENDING
         )
         trainingPlanRepository.save(trainingPlan)
 
@@ -85,8 +77,113 @@ class PeriodizationService(
 
         return PlanResponse(
             planId = planId,
-            message = "Plano de treinamento gerado com sucesso"
+            message = "Plano pendente de pagamento criado com sucesso"
         )
+    }
+
+    /**
+     * Gera o conteúdo de um plano que já foi aprovado para pagamento
+     */
+    @Transactional
+    fun generateApprovedPlan(planId: String, userEmail: String): PlanResponse {
+        // Verificar se o usuário existe
+        val user = userRepository.findByEmail(userEmail)
+            .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
+
+        // Buscar o plano pelo ID
+        val trainingPlan = trainingPlanRepository.findByPlanId(planId)
+            .orElseThrow { RuntimeException("Plano não encontrado com o ID: $planId") }
+
+        // Verificar se o plano pertence ao usuário
+        if (trainingPlan.user?.id != user.id && !user.roles.any { it.name == "ROLE_ADMIN" }) {
+            throw AccessDeniedException("Este plano não pertence ao usuário logado")
+        }
+
+        // Verificar se o plano está no estado correto para ser gerado
+        if (trainingPlan.status != PlanStatus.PAYMENT_APPROVED && trainingPlan.status != PlanStatus.FAILED) {
+            throw IllegalStateException("Este plano não está aprovado para geração. Status atual: ${trainingPlan.status}")
+        }
+
+        try {
+            // Atualizar status para GENERATING
+            trainingPlan.status = PlanStatus.GENERATING
+            trainingPlanRepository.save(trainingPlan)
+
+            // Construir o objeto AthleteData a partir dos dados do plano
+            val athleteData = AthleteData(
+                nome = trainingPlan.athleteName,
+                idade = trainingPlan.athleteAge,
+                peso = trainingPlan.athleteWeight,
+                altura = trainingPlan.athleteHeight,
+                experiencia = trainingPlan.experienceLevel,
+                objetivo = trainingPlan.trainingGoal,
+                disponibilidade = trainingPlan.availability,
+                lesoes = trainingPlan.injuries,
+                historico = trainingPlan.trainingHistory,
+                benchmarks = benchmarkDataRepository.findByPlanId(planId).orElse(null)?.let {
+                    Benchmarks(
+                        backSquat = it.backSquat,
+                        deadlift = it.deadlift,
+                        clean = it.clean,
+                        snatch = it.snatch,
+                        fran = it.fran,
+                        grace = it.grace
+                    )
+                }
+            )
+
+            // Gerar o conteúdo do plano usando o serviço Anthropic
+            val planContent = anthropicService.generateTrainingPlan(athleteData, trainingPlan.planDuration)
+
+            // Criar planilha Excel
+            val excelData = createExcelWorkbook(athleteData, planContent)
+            val excelFilePath = fileStorageService.saveFile(planId, excelData)
+
+            // Atualizar o plano com o conteúdo gerado
+            trainingPlan.planContent = planContent
+            trainingPlan.excelFilePath = excelFilePath
+            trainingPlan.status = PlanStatus.COMPLETED
+            trainingPlanRepository.save(trainingPlan)
+
+            return PlanResponse(
+                planId = planId,
+                message = "Plano de treinamento gerado com sucesso"
+            )
+        } catch (e: Exception) {
+            // Em caso de erro, marcar o plano como FAILED
+            trainingPlan.status = PlanStatus.FAILED
+            trainingPlanRepository.save(trainingPlan)
+            throw e
+        }
+    }
+
+    /**
+     * Método legado para compatibilidade - agora divide o processo em duas etapas
+     */
+    @Transactional
+    fun generatePlan(request: PlanRequest, userEmail: String): PlanResponse {
+        // Verificar se o usuário existe
+        val user = userRepository.findByEmail(userEmail)
+            .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
+
+        // Verificar se o usuário tem uma assinatura ativa ou é administrador
+        val hasActiveSubscription = user.subscriptionExpiry?.isAfter(LocalDateTime.now()) ?: false
+
+        if (!hasActiveSubscription && !user.roles.any { it.name == "ROLE_ADMIN" }) {
+            throw AccessDeniedException("É necessário um pagamento para gerar planos de treinamento")
+        }
+
+        // Criar plano pendente
+        val pendingResponse = createPendingPlan(request, userEmail)
+        val planId = pendingResponse.planId
+
+        // Simular aprovação imediata (para compatibilidade)
+        val trainingPlan = trainingPlanRepository.findByPlanId(planId).get()
+        trainingPlan.status = PlanStatus.PAYMENT_APPROVED
+        trainingPlanRepository.save(trainingPlan)
+
+        // Gerar o plano aprovado
+        return generateApprovedPlan(planId, userEmail)
     }
 
     fun getPlanExcel(planId: String, userEmail: String): ByteArray {
@@ -118,6 +215,11 @@ class PeriodizationService(
 
         val benchmarks = benchmarkDataRepository.findByPlanId(planId).orElse(null)
 
+        // Verificar se o plano pode ser gerado
+        // (se o pagamento foi aprovado mas o plano ainda não foi gerado com sucesso)
+        val canGenerate = trainingPlan.status == PlanStatus.PAYMENT_APPROVED ||
+                trainingPlan.status == PlanStatus.FAILED
+
         return PlanDetailsResponse(
             planId = trainingPlan.planId,
             athleteName = trainingPlan.athleteName,
@@ -141,7 +243,9 @@ class PeriodizationService(
                     "fran" to it.fran,
                     "grace" to it.grace
                 )
-            }
+            },
+            status = trainingPlan.status,
+            canGenerate = canGenerate
         )
     }
 
@@ -159,6 +263,10 @@ class PeriodizationService(
 
         return plans.map { plan ->
             val benchmarks = benchmarkDataRepository.findByPlanId(plan.planId).orElse(null)
+
+            // Verificar se o plano pode ser gerado (se o pagamento foi aprovado mas o plano ainda não foi gerado)
+            val canGenerate = plan.status == PlanStatus.PAYMENT_APPROVED ||
+                    plan.status == PlanStatus.FAILED
 
             PlanDetailsResponse(
                 planId = plan.planId,
@@ -183,7 +291,9 @@ class PeriodizationService(
                         "fran" to it.fran,
                         "grace" to it.grace
                     )
-                }
+                },
+                status = plan.status,
+                canGenerate = canGenerate
             )
         }
     }

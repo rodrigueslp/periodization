@@ -1,5 +1,7 @@
 package com.extrabox.periodization.model
 
+import com.extrabox.periodization.enums.PlanStatus
+
 data class PlanDetailsResponse(
     val planId: String,
     val athleteName: String,
@@ -14,5 +16,7 @@ data class PlanDetailsResponse(
     val planDuration: Int,
     val planContent: String,
     val createdAt: String,
-    val benchmarks: Map<String, Any?>?
+    val benchmarks: Map<String, Any?>?,
+    val status: PlanStatus,
+    val canGenerate: Boolean = false
 )

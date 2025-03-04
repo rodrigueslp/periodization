@@ -26,7 +26,27 @@ class PeriodizationController(
 ) {
 
     @PostMapping
-    @Operation(summary = "Gerar um novo plano de periodização", description = "Cria um plano de periodização baseado nos dados do atleta")
+    @Operation(summary = "Criar um plano pendente de pagamento", description = "Cria um plano pendente de pagamento baseado nos dados do atleta")
+    fun createPendingPlan(
+        @Valid @RequestBody request: PlanRequest,
+        @AuthenticationPrincipal userDetails: UserDetails
+    ): ResponseEntity<PlanResponse> {
+        val response = periodizationService.createPendingPlan(request, userDetails.username)
+        return ResponseEntity.status(HttpStatus.CREATED).body(response)
+    }
+
+    @PostMapping("/{planId}/generate")
+    @Operation(summary = "Gerar conteúdo de um plano aprovado", description = "Gera o conteúdo de um plano que já foi aprovado para pagamento")
+    fun generateApprovedPlan(
+        @PathVariable planId: String,
+        @AuthenticationPrincipal userDetails: UserDetails
+    ): ResponseEntity<PlanResponse> {
+        val response = periodizationService.generateApprovedPlan(planId, userDetails.username)
+        return ResponseEntity.status(HttpStatus.OK).body(response)
+    }
+
+    @PostMapping("/legacy")
+    @Operation(summary = "Gerar um novo plano (legado)", description = "Método legado para compatibilidade - cria e gera um plano em um único passo")
     fun generatePlan(
         @Valid @RequestBody request: PlanRequest,
         @AuthenticationPrincipal userDetails: UserDetails

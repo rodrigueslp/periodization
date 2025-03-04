@@ -1,9 +1,11 @@
 package com.extrabox.periodization.service
 
 import com.extrabox.periodization.entity.Payment
+import com.extrabox.periodization.enums.PlanStatus
 import com.extrabox.periodization.model.payment.PaymentRequest
 import com.extrabox.periodization.model.payment.PaymentResponse
 import com.extrabox.periodization.repository.PaymentRepository
+import com.extrabox.periodization.repository.TrainingPlanRepository
 import com.extrabox.periodization.repository.UserRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -25,6 +27,7 @@ import java.util.*
 class PaymentService(
     private val userRepository: UserRepository,
     private val paymentRepository: PaymentRepository,
+    private val trainingPlanRepository: TrainingPlanRepository,
     private val userService: UserService,
 
     @Value("\${mercado-pago.access-token}")
@@ -253,12 +256,17 @@ class PaymentService(
                     payment.updatedAt = LocalDateTime.now()
                     paymentRepository.save(payment)
 
-                    // Se aprovado, atualizar assinatura do usuário
+                    // Se aprovado, atualizar assinatura do usuário e status do plano
                     if (status == "approved") {
                         val user = payment.user
                         if (user != null) {
                             userService.updateSubscription(user.email, "SINGLE_PLAN", 1)
                             logger.info("Assinatura ativada para usuário: ${user.email}")
+
+                            // Atualizar status do plano se tiver planId
+                            payment.planId?.let { planId ->
+                                updatePlanStatus(planId, PlanStatus.PAYMENT_APPROVED)
+                            }
                         }
                     }
 
@@ -315,9 +323,14 @@ class PaymentService(
                         payment.updatedAt = LocalDateTime.now()
                         paymentRepository.save(payment)
 
-                        // Se aprovado, atualizar assinatura do usuário
+                        // Se aprovado, atualizar assinatura do usuário e status do plano
                         if (currentStatus == "approved") {
                             userService.updateSubscription(user.email, "SINGLE_PLAN", 1)
+
+                            // Atualizar status do plano se tiver planId
+                            payment.planId?.let { planId ->
+                                updatePlanStatus(planId, PlanStatus.PAYMENT_APPROVED)
+                            }
                         }
                     }
 
@@ -366,9 +379,14 @@ class PaymentService(
                             payment.updatedAt = LocalDateTime.now()
                             paymentRepository.save(payment)
 
-                            // Se aprovado, atualizar assinatura do usuário
+                            // Se aprovado, atualizar assinatura do usuário e status do plano
                             if (currentStatus == "approved") {
                                 userService.updateSubscription(user.email, "SINGLE_PLAN", 1)
+
+                                // Atualizar status do plano se tiver planId
+                                payment.planId?.let { planId ->
+                                    updatePlanStatus(planId, PlanStatus.PAYMENT_APPROVED)
+                                }
                             }
 
                             return currentStatus
@@ -400,6 +418,24 @@ class PaymentService(
         }
     }
 
+    /**
+     * Atualiza o status de um plano de treinamento
+     */
+    @Transactional
+    fun updatePlanStatus(planId: String, status: PlanStatus) {
+        try {
+            val trainingPlan = trainingPlanRepository.findByPlanId(planId)
+                .orElseThrow { RuntimeException("Plano não encontrado com o ID: $planId") }
+
+            trainingPlan.status = status
+            trainingPlanRepository.save(trainingPlan)
+            logger.info("Status do plano $planId atualizado para $status")
+        } catch (e: Exception) {
+            logger.error("Erro ao atualizar status do plano $planId: ${e.message}", e)
+            throw e
+        }
+    }
+
     @Transactional
     fun simulatePaymentApproval(externalReference: String, userEmail: String): String {
         val user = userRepository.findByEmail(userEmail)
@@ -415,6 +451,11 @@ class PaymentService(
 
         // Atualizar assinatura do usuário
         userService.updateSubscription(user.email, "SINGLE_PLAN", 1)
+
+        // Atualizar status do plano se tiver planId
+        payment.planId?.let { planId ->
+            updatePlanStatus(planId, PlanStatus.PAYMENT_APPROVED)
+        }
 
         return "approved"
     }
