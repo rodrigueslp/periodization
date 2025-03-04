@@ -1,28 +1,30 @@
-# Use JDK 21 as the base image
+# Use JDK 21 como imagem base
 FROM eclipse-temurin:21-jdk-alpine
 
-# Set working directory
+# Define o diretório de trabalho
 WORKDIR /app
 
-# Copy gradle files for dependency resolution
-COPY build.gradle.kts settings.gradle.kts gradlew ./
+# Copia os arquivos gradle para resolução de dependências
+COPY build.gradle.kts settings.gradle.kts ./
 COPY gradle ./gradle
 
-# Copy source code
-COPY src ./src
-COPY gradle.properties ./gradle.properties
+# Cria o wrapper gradle se não existir
+RUN if [ ! -f "gradlew" ]; then touch gradlew && chmod +x gradlew; fi
 
-# Build the application
+# Copia o código fonte
+COPY src ./src
+
+# Constrói a aplicação
 RUN ./gradlew bootJar --no-daemon
 
-# Create directory for file storage
+# Cria diretório para armazenamento de arquivos
 RUN mkdir -p files
 
-# Runtime configuration
+# Configuração de runtime
 EXPOSE 8080
 
-# Set Railway-specific environment variable to use the assigned port
+# Define variável de ambiente específica do Railway para usar a porta atribuída
 ENV PORT=8080
 
-# Entry point to run the application
+# Ponto de entrada para executar a aplicação
 ENTRYPOINT ["java", "-jar", "/app/build/libs/*.jar"]
