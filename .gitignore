@@ -38,3 +38,7 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+*.xlsx
+*-dev.yml
+src/main/resources/application-dev.yml

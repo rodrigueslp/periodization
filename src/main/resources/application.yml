@@ -1,14 +1,14 @@
 spring:
   application:
-    name: crossfit-periodization
+    name: periodization
   servlet:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
   datasource:
-    url: jdbc:postgresql://localhost:5432/periodization
-    username: postgres
-    password: postgres
+    url: ${DATASOURCE_URL}
+    username: ${DATASOURCE_USERNAME}
+    password: ${DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -17,13 +17,23 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
     show-sql: true
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope:
+              - email
+              - profile
 
 server:
   port: 8080
 
 anthropic:
   api:
-    key: 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
+    key: ${ANTHROPIC_API_KEY}
     url: https://api.anthropic.com/v1/messages
     model: claude-3-7-sonnet-20250219
 
@@ -36,3 +46,14 @@ springdoc:
 file:
   storage:
     path: ${FILE_STORAGE_PATH:./files}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration: 86400000 # 24 horas em milissegundos
+  oauth2:
+    redirectUri: ${OAUTH2_REDIRECT_URI}
+  frontend-url: ${FRONT_URL}
+
+mercado-pago:
+  access-token: ${MERCADO_PAGO_TOKEN}

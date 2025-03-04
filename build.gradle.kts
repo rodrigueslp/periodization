@@ -31,6 +31,15 @@ dependencies {
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.1.0")
 	implementation("com.squareup.okhttp3:okhttp:4.11.0")
 	implementation("org.postgresql:postgresql")
+
+	implementation("com.mercadopago:sdk-java:2.1.29")
+
+	implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+	implementation("org.springframework.boot:spring-boot-starter-security")
+	implementation("io.jsonwebtoken:jjwt-api:0.11.5")
+	implementation("io.jsonwebtoken:jjwt-impl:0.11.5")
+	implementation("io.jsonwebtoken:jjwt-jackson:0.11.5")
+
 	testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 

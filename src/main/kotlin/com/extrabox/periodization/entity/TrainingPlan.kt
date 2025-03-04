@@ -49,6 +49,11 @@ class TrainingPlan {
     @Column(name = "created_at", nullable = false)
     var createdAt: LocalDateTime = LocalDateTime.now()
 
+    // Nova relação com o usuário
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    var user: User? = null
+
     // Construtor secundário que recebe todos os parâmetros para facilitar a migração do código existente
     constructor(
         planId: String,
@@ -64,7 +69,8 @@ class TrainingPlan {
         planDuration: Int,
         planContent: String,
         excelFilePath: String,
-        createdAt: LocalDateTime = LocalDateTime.now()
+        createdAt: LocalDateTime = LocalDateTime.now(),
+        user: User? = null
     ) {
         this.planId = planId
         this.athleteName = athleteName
@@ -80,6 +86,7 @@ class TrainingPlan {
         this.planContent = planContent
         this.excelFilePath = excelFilePath
         this.createdAt = createdAt
+        this.user = user
     }
 
     // Construtor padrão sem argumentos necessário para o JPA
@@ -92,38 +99,11 @@ class TrainingPlan {
         other as TrainingPlan
 
         if (planId != other.planId) return false
-        if (athleteName != other.athleteName) return false
-        if (athleteAge != other.athleteAge) return false
-        if (athleteWeight != other.athleteWeight) return false
-        if (athleteHeight != other.athleteHeight) return false
-        if (experienceLevel != other.experienceLevel) return false
-        if (trainingGoal != other.trainingGoal) return false
-        if (availability != other.availability) return false
-        if (injuries != other.injuries) return false
-        if (trainingHistory != other.trainingHistory) return false
-        if (planDuration != other.planDuration) return false
-        if (planContent != other.planContent) return false
-        if (excelFilePath != other.excelFilePath) return false
-        if (createdAt != other.createdAt) return false
 
         return true
     }
 
     override fun hashCode(): Int {
-        var result = planId.hashCode()
-        result = 31 * result + athleteName.hashCode()
-        result = 31 * result + athleteAge
-        result = 31 * result + athleteWeight.hashCode()
-        result = 31 * result + athleteHeight
-        result = 31 * result + experienceLevel.hashCode()
-        result = 31 * result + trainingGoal.hashCode()
-        result = 31 * result + availability
-        result = 31 * result + (injuries?.hashCode() ?: 0)
-        result = 31 * result + (trainingHistory?.hashCode() ?: 0)
-        result = 31 * result + planDuration
-        result = 31 * result + planContent.hashCode()
-        result = 31 * result + excelFilePath.hashCode()
-        result = 31 * result + createdAt.hashCode()
-        return result
+        return planId.hashCode()
     }
 }

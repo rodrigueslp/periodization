@@ -8,23 +8,39 @@ import com.extrabox.periodization.model.PlanRequest
 import com.extrabox.periodization.model.PlanResponse
 import com.extrabox.periodization.repository.BenchmarkDataRepository
 import com.extrabox.periodization.repository.TrainingPlanRepository
+import com.extrabox.periodization.repository.UserRepository
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
+import org.springframework.security.access.AccessDeniedException
+import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.io.ByteArrayOutputStream
-import java.util.*
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.*
 
 @Service
 class PeriodizationService(
     private val anthropicService: AnthropicService,
     private val trainingPlanRepository: TrainingPlanRepository,
     private val benchmarkDataRepository: BenchmarkDataRepository,
-    private val fileStorageService: FileStorageService
+    private val fileStorageService: FileStorageService,
+    private val userRepository: UserRepository
 ) {
 
     @Transactional
-    fun generatePlan(request: PlanRequest): PlanResponse {
+    fun generatePlan(request: PlanRequest, userEmail: String): PlanResponse {
+        // Verificar se o usuário existe
+        val user = userRepository.findByEmail(userEmail)
+            .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
+
+        // Verificar se o usuário tem uma assinatura ativa ou é administrador
+        val hasActiveSubscription = user.subscriptionExpiry?.isAfter(LocalDateTime.now()) ?: false
+
+        if (!hasActiveSubscription && !user.roles.any { it.name == "ROLE_ADMIN" }) {
+            throw AccessDeniedException("É necessário um pagamento para gerar planos de treinamento")
+        }
+
         val planId = UUID.randomUUID().toString()
         val planContent = anthropicService.generateTrainingPlan(request.athleteData, request.planDuration)
 
@@ -48,7 +64,8 @@ class PeriodizationService(
             trainingHistory = request.athleteData.historico,
             planDuration = request.planDuration,
             planContent = planContent,
-            excelFilePath = excelFilePath
+            excelFilePath = excelFilePath,
+            user = user
         )
         trainingPlanRepository.save(trainingPlan)
 
@@ -72,15 +89,32 @@ class PeriodizationService(
         )
     }
 
-    fun getPlanExcel(planId: String): ByteArray {
+    fun getPlanExcel(planId: String, userEmail: String): ByteArray {
         val trainingPlan = trainingPlanRepository.findByPlanId(planId)
             .orElseThrow { RuntimeException("Plano não encontrado com o ID: $planId") }
+
+        // Verificar se o plano pertence ao usuário ou se o usuário é admin
+        val user = userRepository.findByEmail(userEmail)
+            .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
+
+        if (trainingPlan.user?.id != user.id && !user.roles.any { it.name == "ROLE_ADMIN" }) {
+            throw AccessDeniedException("Acesso negado. Este plano não pertence ao usuário logado.")
+        }
+
         return fileStorageService.loadFile(planId)
     }
 
-    fun getPlanContent(planId: String): PlanDetailsResponse {
+    fun getPlanContent(planId: String, userEmail: String): PlanDetailsResponse {
         val trainingPlan = trainingPlanRepository.findByPlanId(planId)
             .orElseThrow { RuntimeException("Plano não encontrado com o ID: $planId") }
+
+        // Verificar se o plano pertence ao usuário ou se o usuário é admin
+        val user = userRepository.findByEmail(userEmail)
+            .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
+
+        if (trainingPlan.user?.id != user.id && !user.roles.any { it.name == "ROLE_ADMIN" }) {
+            throw AccessDeniedException("Acesso negado. Este plano não pertence ao usuário logado.")
+        }
 
         val benchmarks = benchmarkDataRepository.findByPlanId(planId).orElse(null)
 
@@ -111,8 +145,19 @@ class PeriodizationService(
         )
     }
 
-    fun getAllPlans(): List<PlanDetailsResponse> {
-        return trainingPlanRepository.findTop10ByOrderByCreatedAtDesc().map { plan ->
+    fun getUserPlans(userEmail: String): List<PlanDetailsResponse> {
+        val user = userRepository.findByEmail(userEmail)
+            .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
+
+        val plans = if (user.roles.any { it.name == "ROLE_ADMIN" }) {
+            // Administradores podem ver todos os planos
+            trainingPlanRepository.findTop10ByOrderByCreatedAtDesc()
+        } else {
+            // Usuários normais só veem seus próprios planos
+            trainingPlanRepository.findByUserOrderByCreatedAtDesc(user)
+        }
+
+        return plans.map { plan ->
             val benchmarks = benchmarkDataRepository.findByPlanId(plan.planId).orElse(null)
 
             PlanDetailsResponse(
