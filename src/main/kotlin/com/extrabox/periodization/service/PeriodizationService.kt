@@ -3,20 +3,18 @@ package com.extrabox.periodization.service
 import com.extrabox.periodization.entity.BenchmarkData
 import com.extrabox.periodization.enums.PlanStatus
 import com.extrabox.periodization.entity.TrainingPlan
-import com.extrabox.periodization.model.AthleteData
-import com.extrabox.periodization.model.Benchmarks
+import com.extrabox.periodization.messaging.PlanGenerationProducer
 import com.extrabox.periodization.model.PlanDetailsResponse
 import com.extrabox.periodization.model.PlanRequest
 import com.extrabox.periodization.model.PlanResponse
 import com.extrabox.periodization.repository.BenchmarkDataRepository
 import com.extrabox.periodization.repository.TrainingPlanRepository
 import com.extrabox.periodization.repository.UserRepository
-import org.apache.poi.xssf.usermodel.XSSFWorkbook
+import org.slf4j.LoggerFactory
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.io.ByteArrayOutputStream
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
@@ -27,8 +25,10 @@ class PeriodizationService(
     private val trainingPlanRepository: TrainingPlanRepository,
     private val benchmarkDataRepository: BenchmarkDataRepository,
     private val fileStorageService: FileStorageService,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val planGenerationProducer: PlanGenerationProducer
 ) {
+    private val logger = LoggerFactory.getLogger(PeriodizationService::class.java)
 
     /**
      * Cria um novo plano sem conteúdo, apenas com os dados básicos do atleta e status PAYMENT_PENDING
@@ -82,7 +82,7 @@ class PeriodizationService(
     }
 
     /**
-     * Gera o conteúdo de um plano que já foi aprovado para pagamento
+     * Inicia a geração assíncrona de um plano que já foi aprovado para pagamento
      */
     @Transactional
     fun generateApprovedPlan(planId: String, userEmail: String): PlanResponse {
@@ -105,51 +105,21 @@ class PeriodizationService(
         }
 
         try {
-            // Atualizar status para GENERATING
-            trainingPlan.status = PlanStatus.GENERATING
+            // Atualizar status para QUEUED
+            trainingPlan.status = PlanStatus.QUEUED
             trainingPlanRepository.save(trainingPlan)
 
-            // Construir o objeto AthleteData a partir dos dados do plano
-            val athleteData = AthleteData(
-                nome = trainingPlan.athleteName,
-                idade = trainingPlan.athleteAge,
-                peso = trainingPlan.athleteWeight,
-                altura = trainingPlan.athleteHeight,
-                experiencia = trainingPlan.experienceLevel,
-                objetivo = trainingPlan.trainingGoal,
-                disponibilidade = trainingPlan.availability,
-                lesoes = trainingPlan.injuries,
-                historico = trainingPlan.trainingHistory,
-                benchmarks = benchmarkDataRepository.findByPlanId(planId).orElse(null)?.let {
-                    Benchmarks(
-                        backSquat = it.backSquat,
-                        deadlift = it.deadlift,
-                        clean = it.clean,
-                        snatch = it.snatch,
-                        fran = it.fran,
-                        grace = it.grace
-                    )
-                }
-            )
-
-            // Gerar o conteúdo do plano usando o serviço Anthropic
-            val planContent = anthropicService.generateTrainingPlan(athleteData, trainingPlan.planDuration)
-
-            // Criar planilha Excel
-            val excelData = createExcelWorkbook(athleteData, planContent)
-            val excelFilePath = fileStorageService.saveFile(planId, excelData)
-
-            // Atualizar o plano com o conteúdo gerado
-            trainingPlan.planContent = planContent
-            trainingPlan.excelFilePath = excelFilePath
-            trainingPlan.status = PlanStatus.COMPLETED
-            trainingPlanRepository.save(trainingPlan)
+            // Enviar mensagem para o RabbitMQ
+            logger.info("Enviando plano $planId para a fila de geração")
+            planGenerationProducer.sendPlanGenerationRequest(planId, userEmail)
 
             return PlanResponse(
                 planId = planId,
-                message = "Plano de treinamento gerado com sucesso"
+                message = "Plano de treinamento enviado para geração assíncrona"
             )
         } catch (e: Exception) {
+            logger.error("Erro ao enfileirar plano para geração: ${e.message}", e)
+
             // Em caso de erro, marcar o plano como FAILED
             trainingPlan.status = PlanStatus.FAILED
             trainingPlanRepository.save(trainingPlan)
@@ -296,79 +266,5 @@ class PeriodizationService(
                 canGenerate = canGenerate
             )
         }
-    }
-
-    private fun createExcelWorkbook(athleteData: AthleteData, planContent: String): ByteArray {
-        val workbook = XSSFWorkbook()
-
-        // Criar folha de informações do atleta
-        val infoSheet = workbook.createSheet("Informações do Atleta")
-
-        var rowIndex = 0
-
-        // Título
-        var row = infoSheet.createRow(rowIndex++)
-        var cell = row.createCell(0)
-        cell.setCellValue("PLANO DE PERIODIZAÇÃO DE CROSSFIT")
-
-        // Espaço
-        rowIndex++
-
-        // Informações do atleta
-        row = infoSheet.createRow(rowIndex++)
-        row.createCell(0).setCellValue("Nome:")
-        row.createCell(1).setCellValue(athleteData.nome)
-
-        row = infoSheet.createRow(rowIndex++)
-        row.createCell(0).setCellValue("Idade:")
-        row.createCell(1).setCellValue(athleteData.idade.toString() + " anos")
-
-        row = infoSheet.createRow(rowIndex++)
-        row.createCell(0).setCellValue("Peso:")
-        row.createCell(1).setCellValue(athleteData.peso.toString() + " kg")
-
-        row = infoSheet.createRow(rowIndex++)
-        row.createCell(0).setCellValue("Altura:")
-        row.createCell(1).setCellValue(athleteData.altura.toString() + " cm")
-
-        row = infoSheet.createRow(rowIndex++)
-        row.createCell(0).setCellValue("Experiência:")
-        row.createCell(1).setCellValue(athleteData.experiencia)
-
-        row = infoSheet.createRow(rowIndex++)
-        row.createCell(0).setCellValue("Objetivo:")
-        row.createCell(1).setCellValue(athleteData.objetivo)
-
-        row = infoSheet.createRow(rowIndex++)
-        row.createCell(0).setCellValue("Disponibilidade:")
-        row.createCell(1).setCellValue(athleteData.disponibilidade.toString() + " dias por semana")
-
-        // Criar folha de plano de treinamento
-        val planSheet = workbook.createSheet("Plano de Treinamento")
-
-        rowIndex = 0
-        row = planSheet.createRow(rowIndex++)
-        cell = row.createCell(0)
-        cell.setCellValue("PLANO DE TREINAMENTO")
-
-        // Adicionar o conteúdo do plano
-        val lines = planContent.split("\n")
-        for (line in lines) {
-            row = planSheet.createRow(rowIndex++)
-            cell = row.createCell(0)
-            cell.setCellValue(line)
-        }
-
-        // Ajustar largura das colunas
-        infoSheet.autoSizeColumn(0)
-        infoSheet.autoSizeColumn(1)
-        planSheet.autoSizeColumn(0)
-
-        // Converter o workbook para ByteArray
-        val outputStream = ByteArrayOutputStream()
-        workbook.write(outputStream)
-        workbook.close()
-
-        return outputStream.toByteArray()
     }
 }
