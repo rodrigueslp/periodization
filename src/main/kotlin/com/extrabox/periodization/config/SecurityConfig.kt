@@ -66,6 +66,7 @@ class SecurityConfig(
         val configuration = CorsConfiguration()
         configuration.allowedOrigins = listOf("http://localhost:3000",
             "https://periodization-frontend-production.up.railway.app",
+            "https://periodization-production.up.railway.app",
             "https://app.planilize.com.br")
         configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
         configuration.allowedHeaders = listOf("Authorization", "Content-Type")
