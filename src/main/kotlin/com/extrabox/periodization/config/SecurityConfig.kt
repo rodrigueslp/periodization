@@ -78,18 +78,10 @@ class SecurityConfig(
     @Bean
     fun corsConfigurationSource(): CorsConfigurationSource {
         val configuration = CorsConfiguration()
-        configuration.allowedOrigins = listOf(
-            "http://localhost:3000",
-            "https://periodization-frontend-production.up.railway.app",
-            "https://periodization-production.up.railway.app",
-            "https://app.planilize.com.br"
-        )
-        configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
-        configuration.allowedHeaders = listOf("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin")
-        configuration.exposedHeaders = listOf("Authorization")
-        configuration.allowCredentials = true
-        // Adicione o tempo máximo de cache para respostas preflight
-        configuration.maxAge = 3600L
+        configuration.allowedOrigins = listOf("*")  // Permitir todas as origens (apenas para diagnóstico!)
+        configuration.allowedMethods = listOf("*")  // Permitir todos os métodos
+        configuration.allowedHeaders = listOf("*")  // Permitir todos os cabeçalhos
+        configuration.allowCredentials = false     // Quando usando "*", allowCredentials deve ser false
 
         val source = UrlBasedCorsConfigurationSource()
         source.registerCorsConfiguration("/**", configuration)
