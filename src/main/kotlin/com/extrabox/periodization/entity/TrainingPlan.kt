@@ -38,6 +38,9 @@ class TrainingPlan {
     @Column(name = "training_history")
     var trainingHistory: String? = null
 
+    @Column(name = "detailed_goal")
+    var detailedGoal: String? = null
+
     @Column(name = "plan_duration", nullable = false)
     var planDuration: Int = 0
 
@@ -71,6 +74,7 @@ class TrainingPlan {
         availability: Int,
         injuries: String?,
         trainingHistory: String?,
+        detailedGoal: String?,
         planDuration: Int,
         planContent: String,
         excelFilePath: String,
@@ -88,6 +92,7 @@ class TrainingPlan {
         this.availability = availability
         this.injuries = injuries
         this.trainingHistory = trainingHistory
+        this.detailedGoal = detailedGoal
         this.planDuration = planDuration
         this.planContent = planContent
         this.excelFilePath = excelFilePath

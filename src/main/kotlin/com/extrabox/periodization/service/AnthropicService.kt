@@ -43,6 +43,7 @@ class AnthropicService(
             Objetivo principal: ${athleteData.objetivo}
             Disponibilidade semanal: ${athleteData.disponibilidade} dias
             
+            ${if (!athleteData.objetivoDetalhado.isNullOrBlank()) "Objetivo detalhado: ${athleteData.objetivoDetalhado}" else ""}
             ${if (!athleteData.lesoes.isNullOrBlank()) "Lesões ou limitações: ${athleteData.lesoes}" else ""}
             ${if (!athleteData.historico.isNullOrBlank()) "Histórico de treino: ${athleteData.historico}" else ""}
             

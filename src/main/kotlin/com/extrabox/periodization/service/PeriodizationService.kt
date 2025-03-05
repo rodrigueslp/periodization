@@ -53,6 +53,7 @@ class PeriodizationService(
             availability = request.athleteData.disponibilidade,
             injuries = request.athleteData.lesoes,
             trainingHistory = request.athleteData.historico,
+            detailedGoal = request.athleteData.objetivoDetalhado,
             planDuration = request.planDuration,
             planContent = "", // Vazio até ser gerado
             excelFilePath = "", // Vazio até ser gerado

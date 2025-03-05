@@ -35,6 +35,7 @@ data class AthleteData(
     @field:Max(7, message = "Disponibilidade máxima é 7 dias")
     val disponibilidade: Int,
 
+    val objetivoDetalhado: String? = null,
     val lesoes: String? = null,
     val historico: String? = null,
     val benchmarks: Benchmarks? = null
