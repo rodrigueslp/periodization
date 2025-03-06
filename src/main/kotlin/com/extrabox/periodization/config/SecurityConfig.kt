@@ -99,7 +99,7 @@ class SecurityConfig(
 
     // Adicione esta configuração WebMvcConfigurer para reforçar o CORS
     @Bean
-    fun corsConfigurer(): WebMvcConfigurer {
+    fun securityCorsConfigurer(): WebMvcConfigurer {
         return object : WebMvcConfigurer {
             override fun addCorsMappings(registry: CorsRegistry) {
                 registry.addMapping("/**")
