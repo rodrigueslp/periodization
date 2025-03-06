@@ -3,9 +3,9 @@ spring:
     name: periodization
   web:
     cors:
-      allowed-origins: *
+      allowed-origins: "*"
       allowed-methods: GET,POST,PUT,DELETE,OPTIONS
-      allowed-headers: *
+      allowed-headers: "*"
       allow-credentials: true
       max-age: 3600
   servlet:
