@@ -32,6 +32,8 @@ dependencies {
 	implementation("com.squareup.okhttp3:okhttp:4.11.0")
 	implementation("org.postgresql:postgresql")
 
+	implementation("org.springframework.boot:spring-boot-starter-actuator")
+
 	implementation("org.springframework.boot:spring-boot-starter-amqp")
 
 	implementation("com.mercadopago:sdk-java:2.1.29")
