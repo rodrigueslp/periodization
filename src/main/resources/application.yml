@@ -1,6 +1,13 @@
 spring:
   application:
     name: periodization
+  web:
+    cors:
+      allowed-origins: *
+      allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+      allowed-headers: *
+      allow-credentials: true
+      max-age: 3600
   servlet:
     multipart:
       max-file-size: 10MB
@@ -36,6 +43,7 @@ spring:
 
 server:
   port: ${PORT:8080}
+  address: 0:0:0:0
 
 anthropic:
   api:
@@ -63,3 +71,11 @@ app:
 
 mercado-pago:
   access-token: ${MERCADO_PAGO_TOKEN}
+
+
+logging:
+  level:
+    org:
+      springframework:
+        web: DEBUG
+        security: DEBUG
