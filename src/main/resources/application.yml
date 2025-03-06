@@ -1,13 +1,15 @@
 spring:
   application:
     name: periodization
-  web:
-    cors:
-      allowed-origins: "*"
-      allowed-methods: GET,POST,PUT,DELETE,OPTIONS
-      allowed-headers: "*"
-      allow-credentials: true
-      max-age: 3600
+  main:
+    allow-bean-definition-overriding: true
+#  web:
+#    cors:
+#      allowed-origins: "*"
+#      allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+#      allowed-headers: "*"
+#      allow-credentials: true
+#      max-age: 3600
   servlet:
     multipart:
       max-file-size: 10MB
