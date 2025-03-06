@@ -57,7 +57,6 @@ class SecurityConfig(
                     org.springframework.security.web.util.matcher.AntPathRequestMatcher("/api/**")
                 )
             }
-            .addFilterBefore(CorsFilter(), UsernamePasswordAuthenticationFilter::class.java)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()
@@ -66,17 +65,12 @@ class SecurityConfig(
     @Bean
     fun corsConfigurationSource(): CorsConfigurationSource {
         val configuration = CorsConfiguration()
-        configuration.allowedOrigins = listOf(
-            "http://localhost:3000",
-            "https://periodization-frontend-production.up.railway.app",
-            "https://periodization-production.up.railway.app",
-            "https://app.planilize.com.br"
-        )
+        configuration.applyPermitDefaultValues()
+        configuration.allowedOriginPatterns = listOf("*") // Temporarily allow all origins
         configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
-        configuration.allowedHeaders = listOf("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin")
+        configuration.allowedHeaders = listOf("*")
         configuration.exposedHeaders = listOf("Authorization")
         configuration.allowCredentials = true
-        // Adicione o tempo máximo de cache para respostas preflight
         configuration.maxAge = 3600L
 
         val source = UrlBasedCorsConfigurationSource()
