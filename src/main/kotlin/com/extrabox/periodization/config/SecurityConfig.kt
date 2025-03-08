@@ -17,8 +17,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
-import org.springframework.web.servlet.config.annotation.CorsRegistry
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 
 @Configuration
 @EnableWebSecurity
@@ -45,13 +43,13 @@ class SecurityConfig(
                     .requestMatchers("/api/**").authenticated()
                     .anyRequest().permitAll()
             }
-            .oauth2Login { oauth2 ->
-                oauth2
-                    .userInfoEndpoint { userInfo ->
-                        userInfo.userService(customOAuth2UserService)
-                    }
-                    .successHandler(oAuth2LoginSuccessHandler)
-            }
+//            .oauth2Login { oauth2 ->
+//                oauth2
+//                    .userInfoEndpoint { userInfo ->
+//                        userInfo.userService(customOAuth2UserService)
+//                    }
+//                    .successHandler(oAuth2LoginSuccessHandler)
+//            }
             .sessionManagement { session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             }
@@ -62,7 +60,7 @@ class SecurityConfig(
                 )
             }
             // Adicione o filtro JWT antes do filtro de autenticação
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
+//            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()
     }
