@@ -43,13 +43,13 @@ class SecurityConfig(
                     .requestMatchers("/api/**").authenticated()
                     .anyRequest().permitAll()
             }
-//            .oauth2Login { oauth2 ->
-//                oauth2
-//                    .userInfoEndpoint { userInfo ->
-//                        userInfo.userService(customOAuth2UserService)
-//                    }
-//                    .successHandler(oAuth2LoginSuccessHandler)
-//            }
+            .oauth2Login { oauth2 ->
+                oauth2
+                    .userInfoEndpoint { userInfo ->
+                        userInfo.userService(customOAuth2UserService)
+                    }
+                    .successHandler(oAuth2LoginSuccessHandler)
+            }
             .sessionManagement { session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             }
