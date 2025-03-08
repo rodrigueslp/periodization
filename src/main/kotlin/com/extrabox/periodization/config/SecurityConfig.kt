@@ -65,36 +65,6 @@ class SecurityConfig(
         return http.build()
     }
 
-//    @Bean
-//    fun corsConfigurationSource(): CorsConfigurationSource {
-//        val configuration = CorsConfiguration()
-//
-//        // Não use applyPermitDefaultValues junto com allowedOriginPatterns
-//        // configuration.applyPermitDefaultValues()
-//
-//        // Configuração de origens permitidas
-//        configuration.allowedOriginPatterns = listOf("*") // Em produção, use domínios específicos
-//
-//        // Métodos HTTP permitidos
-//        configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
-//
-//        // Cabeçalhos permitidos
-//        configuration.allowedHeaders = listOf("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin")
-//
-//        // Cabeçalhos expostos
-//        configuration.exposedHeaders = listOf("Authorization")
-//
-//        // Permitir credenciais (cookies, autenticação)
-//        configuration.allowCredentials = true
-//
-//        // Tempo de cache para respostas preflight
-//        configuration.maxAge = 3600L
-//
-//        val source = UrlBasedCorsConfigurationSource()
-//        source.registerCorsConfiguration("/**", configuration)
-//        return source
-//    }
-
     // Adicione esta configuração WebMvcConfigurer para reforçar o CORS
     @Bean
     fun corsConfigurationSource(): CorsConfigurationSource {
@@ -111,13 +81,4 @@ class SecurityConfig(
         return source
     }
 
-    // Adicione um endpoint de health check para verificar se a aplicação está rodando
-//    @Bean
-//    fun healthEndpoint(): WebMvcConfigurer {
-//        return object : WebMvcConfigurer {
-//            override fun addCorsMappings(registry: CorsRegistry) {
-//                registry.addMapping("/health").allowedOriginPatterns("*")
-//            }
-//        }
-//    }
 }
