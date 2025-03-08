@@ -60,7 +60,7 @@ class SecurityConfig(
                 )
             }
             // Adicione o filtro JWT antes do filtro de autenticação
-//            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()
     }
