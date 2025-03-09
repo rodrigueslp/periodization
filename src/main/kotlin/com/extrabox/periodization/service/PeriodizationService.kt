@@ -15,6 +15,7 @@ import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
@@ -41,6 +42,14 @@ class PeriodizationService(
 
         val planId = UUID.randomUUID().toString()
 
+        val startDate = if (request.startDate != null) {
+            LocalDate.parse(request.startDate)
+        } else {
+            LocalDate.now()
+        }
+
+        val endDate = startDate.plusWeeks(request.planDuration.toLong())
+
         // Criar plano pendente de pagamento
         val trainingPlan = TrainingPlan(
             planId = planId,
@@ -58,7 +67,9 @@ class PeriodizationService(
             planContent = "", // Vazio até ser gerado
             excelFilePath = "", // Vazio até ser gerado
             user = user,
-            status = PlanStatus.PAYMENT_PENDING
+            status = PlanStatus.PAYMENT_PENDING,
+            startDate = startDate,
+            endDate = endDate
         )
         trainingPlanRepository.save(trainingPlan)
 
@@ -204,7 +215,8 @@ class PeriodizationService(
             trainingHistory = trainingPlan.trainingHistory,
             planDuration = trainingPlan.planDuration,
             planContent = trainingPlan.planContent,
-            createdAt = trainingPlan.createdAt.format(DateTimeFormatter.ISO_DATE_TIME),
+            createdAt = trainingPlan.createdAt.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                .withLocale(Locale.of("pt", "BR"))),
             benchmarks = benchmarks?.let {
                 mapOf(
                     "backSquat" to it.backSquat,
@@ -216,7 +228,11 @@ class PeriodizationService(
                 )
             },
             status = trainingPlan.status,
-            canGenerate = canGenerate
+            canGenerate = canGenerate,
+            startDate = trainingPlan.startDate?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                .withLocale(Locale.of("pt", "BR"))),
+            endDate = trainingPlan.endDate?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                .withLocale(Locale.of("pt", "BR")))
         )
     }
 
@@ -252,7 +268,8 @@ class PeriodizationService(
                 trainingHistory = plan.trainingHistory,
                 planDuration = plan.planDuration,
                 planContent = plan.planContent,
-                createdAt = plan.createdAt.format(DateTimeFormatter.ISO_DATE_TIME),
+                createdAt = plan.createdAt.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                    .withLocale(Locale.of("pt", "BR"))),
                 benchmarks = benchmarks?.let {
                     mapOf(
                         "backSquat" to it.backSquat,
@@ -264,7 +281,11 @@ class PeriodizationService(
                     )
                 },
                 status = plan.status,
-                canGenerate = canGenerate
+                canGenerate = canGenerate,
+                startDate = plan.startDate?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                    .withLocale(Locale.of("pt", "BR"))),
+                endDate = plan.endDate?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                    .withLocale(Locale.of("pt", "BR")))
             )
         }
     }

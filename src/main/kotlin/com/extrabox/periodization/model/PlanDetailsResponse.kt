@@ -18,5 +18,7 @@ data class PlanDetailsResponse(
     val createdAt: String,
     val benchmarks: Map<String, Any?>?,
     val status: PlanStatus,
-    val canGenerate: Boolean = false
+    val canGenerate: Boolean = false,
+    val startDate: String?,
+    val endDate: String?
 )

@@ -2,6 +2,7 @@ package com.extrabox.periodization.entity
 
 import com.extrabox.periodization.enums.PlanStatus
 import jakarta.persistence.*
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Entity
@@ -62,6 +63,12 @@ class TrainingPlan {
     @JoinColumn(name = "user_id")
     var user: User? = null
 
+    @Column(name = "start_date")
+    var startDate: LocalDate? = null
+
+    @Column(name = "end_date")
+    var endDate: LocalDate? = null
+
     // Construtor secundário que recebe todos os parâmetros para facilitar a migração do código existente
     constructor(
         planId: String,
@@ -80,7 +87,9 @@ class TrainingPlan {
         excelFilePath: String,
         status: PlanStatus,
         createdAt: LocalDateTime = LocalDateTime.now(),
-        user: User? = null
+        user: User? = null,
+        startDate: LocalDate?,
+        endDate: LocalDate?
     ) {
         this.planId = planId
         this.athleteName = athleteName
@@ -99,6 +108,8 @@ class TrainingPlan {
         this.status = status
         this.createdAt = createdAt
         this.user = user
+        this.startDate = startDate
+        this.endDate = endDate
     }
 
     // Construtor padrão sem argumentos necessário para o JPA
