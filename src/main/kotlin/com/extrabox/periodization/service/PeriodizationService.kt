@@ -64,6 +64,8 @@ class PeriodizationService(
             trainingHistory = request.athleteData.historico,
             detailedGoal = request.athleteData.objetivoDetalhado,
             planDuration = request.planDuration,
+            isMainTraining = request.athleteData.treinoPrincipal ?: false,
+            trainingPeriod = request.athleteData.periodoTreino,
             planContent = "", // Vazio até ser gerado
             excelFilePath = "", // Vazio até ser gerado
             user = user,
@@ -215,6 +217,8 @@ class PeriodizationService(
             trainingHistory = trainingPlan.trainingHistory,
             planDuration = trainingPlan.planDuration,
             planContent = trainingPlan.planContent,
+            isMainTraining = trainingPlan.isMainTraining ?: false,
+            trainingPeriod = trainingPlan.trainingPeriod,
             createdAt = trainingPlan.createdAt.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")
                 .withLocale(Locale.of("pt", "BR"))),
             benchmarks = benchmarks?.let {
@@ -268,6 +272,8 @@ class PeriodizationService(
                 trainingHistory = plan.trainingHistory,
                 planDuration = plan.planDuration,
                 planContent = plan.planContent,
+                isMainTraining = plan.isMainTraining ?: false,
+                trainingPeriod = plan.trainingPeriod,
                 createdAt = plan.createdAt.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")
                     .withLocale(Locale.of("pt", "BR"))),
                 benchmarks = benchmarks?.let {

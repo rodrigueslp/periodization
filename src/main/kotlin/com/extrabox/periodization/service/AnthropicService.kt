@@ -47,6 +47,10 @@ class AnthropicService(
             ${if (!athleteData.lesoes.isNullOrBlank()) "Lesões ou limitações: ${athleteData.lesoes}" else ""}
             ${if (!athleteData.historico.isNullOrBlank()) "Histórico de treino: ${athleteData.historico}" else ""}
             
+            ${if (!athleteData.treinoPrincipal) "Este será meu treino principal do atleta" else "Este será meu treino secundário do atleta... um extra para o treino do box"}
+            
+            ${if (!athleteData.periodoTreino.isNullOrBlank()) "O atleta irá treinar sempre no período: ${athleteData.periodoTreino}" else ""}
+            
             ${buildBenchmarksInfo(athleteData)}
             
             Crie uma periodização para ${planDuration} semanas, dividida em fases específicas para atingir o objetivo do atleta.

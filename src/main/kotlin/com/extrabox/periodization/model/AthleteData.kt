@@ -38,6 +38,8 @@ data class AthleteData(
     val objetivoDetalhado: String? = null,
     val lesoes: String? = null,
     val historico: String? = null,
+    val treinoPrincipal: Boolean = false,
+    val periodoTreino: String? = null,
     val benchmarks: Benchmarks? = null
 )
 

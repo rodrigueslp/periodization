@@ -42,6 +42,12 @@ class TrainingPlan {
     @Column(name = "detailed_goal")
     var detailedGoal: String? = null
 
+    @Column(name = "is_main_training", nullable = false)
+    var isMainTraining: Boolean = false
+
+    @Column(name = "training_period")
+    var trainingPeriod: String? = null
+
     @Column(name = "plan_duration", nullable = false)
     var planDuration: Int = 0
 
@@ -82,6 +88,8 @@ class TrainingPlan {
         injuries: String?,
         trainingHistory: String?,
         detailedGoal: String?,
+        isMainTraining: Boolean = false, // Valor padrão para garantir que nunca seja nulo
+        trainingPeriod: String?,
         planDuration: Int,
         planContent: String,
         excelFilePath: String,
@@ -102,6 +110,8 @@ class TrainingPlan {
         this.injuries = injuries
         this.trainingHistory = trainingHistory
         this.detailedGoal = detailedGoal
+        this.isMainTraining = isMainTraining
+        this.trainingPeriod = trainingPeriod
         this.planDuration = planDuration
         this.planContent = planContent
         this.excelFilePath = excelFilePath

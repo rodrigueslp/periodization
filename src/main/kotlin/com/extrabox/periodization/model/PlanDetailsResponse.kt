@@ -15,6 +15,8 @@ data class PlanDetailsResponse(
     val trainingHistory: String?,
     val planDuration: Int,
     val planContent: String,
+    val isMainTraining: Boolean = false,
+    val trainingPeriod: String? = null,
     val createdAt: String,
     val benchmarks: Map<String, Any?>?,
     val status: PlanStatus,
