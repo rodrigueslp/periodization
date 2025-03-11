@@ -6,8 +6,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import java.io.IOException
-import java.security.GeneralSecurityException
 import java.util.Base64
 
 @Component

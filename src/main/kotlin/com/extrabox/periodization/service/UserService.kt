@@ -11,6 +11,7 @@ import com.extrabox.periodization.security.GoogleUserInfo
 import com.extrabox.periodization.security.JwtUtils
 import org.slf4j.LoggerFactory
 import org.springframework.security.core.authority.SimpleGrantedAuthority
+import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -21,9 +22,80 @@ class UserService(
     private val userRepository: UserRepository,
     private val roleRepository: RoleRepository,
     private val jwtUtils: JwtUtils,
-    private val googleTokenVerifier: GoogleTokenVerifier
-) {
+    private val googleTokenVerifier: GoogleTokenVerifier,
+    private val refreshTokenService: RefreshTokenService
+) : UserDetailsProvider {
     private val logger = LoggerFactory.getLogger(UserService::class.java)
+
+    // Método para processar token do Google e retornar usuário e UserDetails
+    fun processGoogleToken(googleToken: String): Pair<User, UserDetails> {
+        val googleUserInfo = googleTokenVerifier.verifyWithGoogle(googleToken)
+            ?: throw RuntimeException("Token inválido ou expirado")
+
+        // Criar ou atualizar usuário
+        val user = findOrCreateUser(googleUserInfo)
+
+        // Criar UserDetails
+        val authorities = user.roles.map { SimpleGrantedAuthority(it.name) }
+        val userDetails = org.springframework.security.core.userdetails.User
+            .withUsername(user.email)
+            .password("")
+            .authorities(authorities)
+            .build()
+
+        return Pair(user, userDetails)
+    }
+
+    fun generateAccessToken(userDetails: UserDetails): String {
+        return jwtUtils.generateJwtToken(userDetails)
+    }
+
+    // Método para construir a resposta JWT
+    fun buildJwtResponse(user: User, accessToken: String, refreshToken: String): JwtResponse {
+        val roles = user.roles.map { it.name }
+        val hasActiveSubscription = user.subscriptionExpiry?.isAfter(LocalDateTime.now()) ?: false
+
+        return JwtResponse(
+            token = accessToken,
+            refreshToken = refreshToken,
+            id = user.id ?: 0,
+            email = user.email,
+            name = user.fullName,
+            roles = roles,
+            profilePicture = user.profilePicture,
+            subscriptionPlan = user.subscriptionPlan,
+            hasActiveSubscription = hasActiveSubscription
+        )
+    }
+
+    // Método para encontrar ou criar usuário baseado nas informações do Google
+    private fun findOrCreateUser(googleUserInfo: GoogleUserInfo): User {
+        val user = userRepository.findByEmail(googleUserInfo.email).orElseGet {
+            // Cria novo usuário
+            val newUser = User(
+                email = googleUserInfo.email,
+                fullName = googleUserInfo.name,
+                googleId = googleUserInfo.sub,
+                profilePicture = googleUserInfo.picture,
+                active = true
+            )
+
+            // Atribui papel USER por padrão
+            val userRole = roleRepository.findByName(Role.ROLE_USER)
+                .orElseGet {
+                    val newRole = Role(name = Role.ROLE_USER)
+                    roleRepository.save(newRole)
+                }
+
+            newUser.roles.add(userRole)
+            userRepository.save(newUser)
+        }
+
+        // Atualiza dados do usuário, se necessário
+        updateUserInfo(user, googleUserInfo)
+
+        return user
+    }
 
     @Transactional
     fun validateToken(googleToken: String): JwtResponse {
@@ -69,11 +141,15 @@ class UserService(
         // Gera token JWT
         val token = jwtUtils.generateJwtToken(userDetails)
 
+        // Gera refresh token
+        val refreshToken = refreshTokenService.createRefreshToken(user.email, userDetails)
+
         val roles = user.roles.map { it.name }
         val hasActiveSubscription = user.subscriptionExpiry?.isAfter(LocalDateTime.now()) ?: false
 
         return JwtResponse(
             token = token,
+            refreshToken = refreshToken.token,
             id = user.id ?: 0,
             email = user.email,
             name = user.fullName,
@@ -82,6 +158,19 @@ class UserService(
             subscriptionPlan = user.subscriptionPlan,
             hasActiveSubscription = hasActiveSubscription
         )
+    }
+
+    override fun loadUserDetailsByEmail(email: String): UserDetails {
+        val user = userRepository.findByEmail(email)
+            .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $email") }
+
+        val authorities = user.roles.map { SimpleGrantedAuthority(it.name) }
+
+        return org.springframework.security.core.userdetails.User
+            .withUsername(user.email)
+            .password("")
+            .authorities(authorities)
+            .build()
     }
 
     private fun updateUserInfo(user: User, googleUserInfo: GoogleUserInfo) {

@@ -20,6 +20,9 @@ class JwtUtils {
     @Value("\${app.jwt.expiration}")
     private var jwtExpirationMs: Long = 0
 
+    @Value("\${app.jwt.refresh-expiration:604800000}") // 7 dias por padrão
+    private var refreshExpirationMs: Long = 0
+
     private lateinit var secretKey: Key
 
     @PostConstruct
@@ -33,6 +36,15 @@ class JwtUtils {
             .setSubject(userDetails.username)
             .setIssuedAt(Date())
             .setExpiration(Date(System.currentTimeMillis() + jwtExpirationMs))
+            .signWith(secretKey)
+            .compact()
+    }
+
+    fun generateRefreshToken(userDetails: UserDetails): String {
+        return Jwts.builder()
+            .setSubject(userDetails.username)
+            .setIssuedAt(Date())
+            .setExpiration(Date(System.currentTimeMillis() + refreshExpirationMs))
             .signWith(secretKey)
             .compact()
     }
@@ -64,5 +76,15 @@ class JwtUtils {
             .build()
             .parseClaimsJws(token)
             .body
+    }
+
+    fun isTokenExpiringSoon(token: String): Boolean {
+        try {
+            val claims = getAllClaimsFromToken(token)
+            val expiration = claims.expiration
+            return (expiration.time - System.currentTimeMillis()) < 300000 // 5 minutos
+        } catch (e: Exception) {
+            return true
+        }
     }
 }

@@ -3,13 +3,6 @@ spring:
     name: periodization
   main:
     allow-bean-definition-overriding: true
-#  web:
-#    cors:
-#      allowed-origins: "*"
-#      allowed-methods: GET,POST,PUT,DELETE,OPTIONS
-#      allowed-headers: "*"
-#      allow-credentials: true
-#      max-age: 3600
   servlet:
     multipart:
       max-file-size: 10MB
@@ -78,6 +71,7 @@ app:
   jwt:
     secret: ${JWT_SECRET}
     expiration: 86400000 # 24 horas em milissegundos
+    refresh-expiration: 604800000 # // 7 dias em milisegundos
   oauth2:
     redirectUri: ${OAUTH2_REDIRECT_URI}
   frontend-url: ${FRONT_URL}

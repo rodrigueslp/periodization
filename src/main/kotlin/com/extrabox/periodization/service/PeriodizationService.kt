@@ -42,7 +42,7 @@ class PeriodizationService(
 
         val planId = UUID.randomUUID().toString()
 
-        val startDate = if (request.startDate != null) {
+        val startDate = if (request.startDate != null && request.startDate != "") {
             LocalDate.parse(request.startDate)
         } else {
             LocalDate.now()

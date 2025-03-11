@@ -1,5 +1,6 @@
 package com.extrabox.periodization.controller.advice
 
+import com.extrabox.periodization.exceptions.TokenRefreshException
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -23,6 +24,14 @@ class GlobalExceptionHandler {
             errors[fieldName] = errorMessage ?: "Erro de validação"
         }
         return ResponseEntity.badRequest().body(errors)
+    }
+
+    @ExceptionHandler(TokenRefreshException::class)
+    fun handleTokenRefreshException(ex: TokenRefreshException): ResponseEntity<Map<String, String>> {
+        logger.error("Token refresh exception", ex)
+        val errors = HashMap<String, String>()
+        errors["error"] = ex.message ?: "Erro ao renovar token"
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errors)
     }
 
     @ExceptionHandler(RuntimeException::class)

@@ -2,6 +2,7 @@ package com.extrabox.periodization.model.auth
 
 data class JwtResponse(
     val token: String,
+    val refreshToken: String,
     val type: String = "Bearer",
     val id: Long,
     val email: String,
