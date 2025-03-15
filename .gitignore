@@ -42,3 +42,5 @@ out/
 *.xlsx
 *-dev.yml
 src/main/resources/application-dev.yml
+
+*.pdf
