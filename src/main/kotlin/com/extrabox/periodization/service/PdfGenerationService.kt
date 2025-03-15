@@ -7,13 +7,20 @@ import org.commonmark.ext.heading.anchor.HeadingAnchorExtension
 import org.commonmark.parser.Parser
 import org.commonmark.renderer.html.HtmlRenderer
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @Service
 class PdfGenerationService {
     private val logger = LoggerFactory.getLogger(PdfGenerationService::class.java)
+
+    // URL da logo - você pode configurar isso no application.properties
+    @Value("\${app.logo.url:http://localhost:3000/static/media/planilize-logo.854402b5f477121cfbd7.png}")
+    private lateinit var logoUrl: String
 
     fun generatePdf(athleteData: AthleteData, planContent: String): ByteArray {
         try {
@@ -63,6 +70,29 @@ class PdfGenerationService {
             .build()
         val contentHtml = renderer.render(document)
 
+        // Verificar se há URL da logo
+        val headerHtml = if (logoUrl.isNotBlank()) {
+            """
+            <div class="header">
+                <div class="logo-container">
+                    <img src="$logoUrl" alt="Logo" class="logo" onerror="this.style.display='none'">
+                </div>
+                <div class="title-container">
+                    <h1 class="title">PLANO DE PERIODIZAÇÃO DE CROSSFIT</h1>
+                </div>
+            </div>
+            """
+        } else {
+            """
+            <div class="header">
+                <h1 class="title">PLANO DE PERIODIZAÇÃO DE CROSSFIT</h1>
+            </div>
+            """
+        }
+
+        // Data atual formatada
+        val currentDate = LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+
         // Construir o HTML completo com CSS para estilizar
         return """
         <!DOCTYPE html>
@@ -77,6 +107,32 @@ class PdfGenerationService {
                     color: #333;
                     margin: 20px;
                 }
+                
+                /* Estilos do cabeçalho com logo */
+                .header {
+                    display: flex;
+                    align-items: center;
+                    margin-bottom: 30px;
+                    border-bottom: 2px solid #2563eb;
+                    padding-bottom: 15px;
+                }
+                .logo-container {
+                    width: 30%;
+                }
+                .logo {
+                    max-width: 150px;
+                    max-height: 70px;
+                }
+                .title-container {
+                    width: 70%;
+                    text-align: right;
+                }
+                .title {
+                    font-size: 24px;
+                    color: #1e3a8a;
+                    margin: 0;
+                }
+                
                 h1 {
                     color: #2563eb;
                     font-size: 24px;
@@ -129,15 +185,6 @@ class PdfGenerationService {
                 .athlete-info p {
                     margin: 5px 0;
                 }
-                .header {
-                    text-align: center;
-                    margin-bottom: 30px;
-                }
-                .header h1 {
-                    font-size: 28px;
-                    color: #1e3a8a;
-                    border-bottom: none;
-                }
                 .section-title {
                     background-color: #e0e7ff;
                     padding: 8px 15px;
@@ -164,12 +211,18 @@ class PdfGenerationService {
                 strong {
                     color: #1e3a8a;
                 }
+                .footer {
+                    margin-top: 30px;
+                    text-align: center;
+                    font-size: 12px;
+                    color: #666;
+                    border-top: 1px solid #e5e7eb;
+                    padding-top: 10px;
+                }
             </style>
         </head>
         <body>
-            <div class="header">
-                <h1>PLANO DE PERIODIZAÇÃO DE CROSSFIT</h1>
-            </div>
+            $headerHtml
             
             <div class="athlete-info">
                 <h2>Informações do Atleta</h2>
@@ -191,6 +244,10 @@ class PdfGenerationService {
             
             <div class="plan-content">
                 $contentHtml
+            </div>
+            
+            <div class="footer">
+                <p>Gerado em $currentDate</p>
             </div>
         </body>
         </html>
