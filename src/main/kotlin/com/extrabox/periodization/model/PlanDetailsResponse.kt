@@ -17,6 +17,8 @@ data class PlanDetailsResponse(
     val planContent: String,
     val isMainTraining: Boolean = false,
     val trainingPeriod: String? = null,
+    val excelFilePath: String? = null,
+    val pdfFilePath: String? = null,
     val createdAt: String,
     val benchmarks: Map<String, Any?>?,
     val status: PlanStatus,

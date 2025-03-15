@@ -9,6 +9,7 @@ import com.extrabox.periodization.repository.BenchmarkDataRepository
 import com.extrabox.periodization.repository.TrainingPlanRepository
 import com.extrabox.periodization.service.AnthropicService
 import com.extrabox.periodization.service.FileStorageService
+import com.extrabox.periodization.service.PdfGenerationService
 import org.slf4j.LoggerFactory
 import org.springframework.amqp.rabbit.annotation.RabbitListener
 import org.springframework.stereotype.Component
@@ -21,7 +22,8 @@ class PlanGenerationConsumer(
     private val anthropicService: AnthropicService,
     private val trainingPlanRepository: TrainingPlanRepository,
     private val benchmarkDataRepository: BenchmarkDataRepository,
-    private val fileStorageService: FileStorageService
+    private val fileStorageService: FileStorageService,
+    private val pdfGenerationService: PdfGenerationService
 ) {
     private val logger = LoggerFactory.getLogger(PlanGenerationConsumer::class.java)
 
@@ -77,14 +79,17 @@ class PlanGenerationConsumer(
             logger.info("Conteúdo gerado com sucesso para plano ${message.planId}")
 
             // Criar planilha Excel
-            logger.info("Criando planilha Excel para plano ${message.planId}")
             val excelData = createExcelWorkbook(athleteData, planContent)
             val excelFilePath = fileStorageService.saveFile(message.planId, excelData)
-            logger.info("Planilha Excel criada e salva com sucesso: $excelFilePath")
+
+            // Criar arquivo PDF - Novo código
+            val pdfData = pdfGenerationService.generatePdf(athleteData, planContent)
+            val pdfFilePath = fileStorageService.savePdfFile(message.planId, pdfData)
 
             // Atualizar o plano com o conteúdo gerado
             trainingPlan.planContent = planContent
             trainingPlan.excelFilePath = excelFilePath
+            trainingPlan.pdfFilePath = pdfFilePath  // Atualizar com o caminho do PDF
             trainingPlan.status = PlanStatus.COMPLETED
             trainingPlanRepository.save(trainingPlan)
 

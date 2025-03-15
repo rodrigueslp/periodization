@@ -72,6 +72,23 @@ class PeriodizationController(
             .body(excelData)
     }
 
+    @GetMapping("/{planId}/download-pdf")
+    @Operation(summary = "Baixar PDF de periodização", description = "Baixar o plano de periodização no formato PDF")
+    fun downloadPlanPdf(
+        @PathVariable planId: String,
+        @AuthenticationPrincipal userDetails: UserDetails
+    ): ResponseEntity<ByteArray> {
+        val pdfData = periodizationService.getPlanPdf(planId, userDetails.username)
+
+        val headers = HttpHeaders()
+        headers.contentType = MediaType.APPLICATION_PDF
+        headers.setContentDispositionFormData("attachment", "periodizacao_crossfit_$planId.pdf")
+
+        return ResponseEntity.ok()
+            .headers(headers)
+            .body(pdfData)
+    }
+
     @GetMapping("/{planId}")
     @Operation(summary = "Obter detalhes do plano", description = "Retorna os detalhes do plano em formato texto")
     fun getPlanDetails(

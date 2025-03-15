@@ -57,6 +57,9 @@ class TrainingPlan {
     @Column(name = "excel_file_path", nullable = false)
     var excelFilePath: String = ""
 
+    @Column(name = "pdf_file_path")
+    var pdfFilePath: String = ""
+
     @Column(name = "status", nullable = false)
     @Enumerated(EnumType.STRING)
     var status: PlanStatus = PlanStatus.PAYMENT_PENDING
@@ -93,6 +96,7 @@ class TrainingPlan {
         planDuration: Int,
         planContent: String,
         excelFilePath: String,
+        pdfFilePath: String,
         status: PlanStatus,
         createdAt: LocalDateTime = LocalDateTime.now(),
         user: User? = null,
@@ -115,6 +119,7 @@ class TrainingPlan {
         this.planDuration = planDuration
         this.planContent = planContent
         this.excelFilePath = excelFilePath
+        this.pdfFilePath = pdfFilePath
         this.status = status
         this.createdAt = createdAt
         this.user = user

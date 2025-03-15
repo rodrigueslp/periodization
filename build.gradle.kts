@@ -36,6 +36,19 @@ dependencies {
 
 	implementation("org.springframework.boot:spring-boot-starter-amqp")
 
+	implementation(platform("com.itextpdf:itext7-core:7.2.5"))
+	implementation("com.itextpdf:kernel:7.2.5")
+	implementation("com.itextpdf:io:7.2.5")
+	implementation("com.itextpdf:layout:7.2.5")
+	implementation("com.itextpdf:html2pdf:4.0.5")
+	implementation("com.itextpdf:forms:7.2.5")
+	implementation("com.itextpdf:pdfa:7.2.5")
+
+	// Para conversão de Markdown para HTML
+	implementation("com.atlassian.commonmark:commonmark:0.17.0")
+	implementation("com.atlassian.commonmark:commonmark-ext-gfm-tables:0.17.0")
+	implementation("com.atlassian.commonmark:commonmark-ext-heading-anchor:0.17.0")
+
 	implementation("com.mercadopago:sdk-java:2.1.29")
 
 	implementation("org.springframework.boot:spring-boot-starter-oauth2-client")

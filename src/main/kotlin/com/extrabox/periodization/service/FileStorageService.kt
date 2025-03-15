@@ -64,4 +64,37 @@ class FileStorageService {
             throw RuntimeException("Falha ao carregar o arquivo", e)
         }
     }
+
+    /**
+     * Salva o arquivo PDF com o ID fornecido
+     */
+    fun savePdfFile(fileId: String, data: ByteArray): String {
+        try {
+            val filePath = Paths.get(storageDirectoryPath, "$fileId.pdf")
+            FileOutputStream(filePath.toFile()).use { outputStream ->
+                outputStream.write(data)
+            }
+            logger.info("Arquivo PDF salvo com sucesso: {}", filePath)
+            return filePath.toString()
+        } catch (e: IOException) {
+            logger.error("Falha ao salvar o arquivo PDF", e)
+            throw RuntimeException("Falha ao salvar o arquivo PDF", e)
+        }
+    }
+
+    /**
+     * Carrega o arquivo PDF com o ID fornecido
+     */
+    fun loadPdfFile(fileId: String): ByteArray {
+        try {
+            val filePath = Paths.get(storageDirectoryPath, "$fileId.pdf")
+            if (!Files.exists(filePath)) {
+                throw RuntimeException("Arquivo PDF não encontrado: $fileId.pdf")
+            }
+            return Files.readAllBytes(filePath)
+        } catch (e: IOException) {
+            logger.error("Falha ao carregar o arquivo PDF", e)
+            throw RuntimeException("Falha ao carregar o arquivo PDF", e)
+        }
+    }
 }

@@ -68,6 +68,7 @@ class PeriodizationService(
             trainingPeriod = request.athleteData.periodoTreino,
             planContent = "", // Vazio até ser gerado
             excelFilePath = "", // Vazio até ser gerado
+            pdfFilePath = "", // Vazio até ser gerado
             user = user,
             status = PlanStatus.PAYMENT_PENDING,
             startDate = startDate,
@@ -219,6 +220,8 @@ class PeriodizationService(
             planContent = trainingPlan.planContent,
             isMainTraining = trainingPlan.isMainTraining ?: false,
             trainingPeriod = trainingPlan.trainingPeriod,
+            pdfFilePath = trainingPlan.pdfFilePath,
+            excelFilePath = trainingPlan.excelFilePath,
             createdAt = trainingPlan.createdAt.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")
                 .withLocale(Locale.of("pt", "BR"))),
             benchmarks = benchmarks?.let {
@@ -238,6 +241,21 @@ class PeriodizationService(
             endDate = trainingPlan.endDate?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")
                 .withLocale(Locale.of("pt", "BR")))
         )
+    }
+
+    fun getPlanPdf(planId: String, userEmail: String): ByteArray {
+        val trainingPlan = trainingPlanRepository.findByPlanId(planId)
+            .orElseThrow { RuntimeException("Plano não encontrado com o ID: $planId") }
+
+        // Verificar se o plano pertence ao usuário ou se o usuário é admin
+        val user = userRepository.findByEmail(userEmail)
+            .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
+
+        if (trainingPlan.user?.id != user.id && !user.roles.any { it.name == "ROLE_ADMIN" }) {
+            throw AccessDeniedException("Acesso negado. Este plano não pertence ao usuário logado.")
+        }
+
+        return fileStorageService.loadPdfFile(planId)
     }
 
     fun getUserPlans(userEmail: String): List<PlanDetailsResponse> {
@@ -274,6 +292,8 @@ class PeriodizationService(
                 planContent = plan.planContent,
                 isMainTraining = plan.isMainTraining ?: false,
                 trainingPeriod = plan.trainingPeriod,
+                pdfFilePath = plan.pdfFilePath,
+                excelFilePath = plan.excelFilePath,
                 createdAt = plan.createdAt.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")
                     .withLocale(Locale.of("pt", "BR"))),
                 benchmarks = benchmarks?.let {
