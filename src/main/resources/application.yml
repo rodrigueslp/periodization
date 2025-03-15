@@ -68,6 +68,8 @@ file:
     path: ${FILE_STORAGE_PATH:./files}
 
 app:
+  logo:
+    url: ${APP_LOGO_URL}
   jwt:
     secret: ${JWT_SECRET}
     expiration: 86400000 # 24 horas em milissegundos
