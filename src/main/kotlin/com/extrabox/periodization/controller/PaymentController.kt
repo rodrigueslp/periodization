@@ -80,6 +80,16 @@ class PaymentController(
         return ResponseEntity.ok(mapOf("message" to "Pagamento aprovado manualmente"))
     }
 
+    @GetMapping("/can-simulate")
+    @Operation(summary = "Verificar permissão de simulação", description = "Verifica se o usuário pode simular pagamentos")
+    @SecurityRequirement(name = "bearerAuth")
+    fun canSimulatePayment(
+        @AuthenticationPrincipal userDetails: UserDetails
+    ): ResponseEntity<Map<String, Boolean>> {
+        val canSimulate = paymentService.canSimulatePayment(userDetails.username)
+        return ResponseEntity.ok(mapOf("canSimulate" to canSimulate))
+    }
+
     @PostMapping("/simulate-approval/{externalReference}")
     @Operation(summary = "Simular aprovação de pagamento para testes",
         description = "Simula a aprovação de um pagamento")

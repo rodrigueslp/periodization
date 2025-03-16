@@ -45,10 +45,28 @@ class PeriodizationService(
         val startDate = if (request.startDate != null && request.startDate != "") {
             LocalDate.parse(request.startDate)
         } else {
-            LocalDate.now()
+            val today = LocalDate.now()
+            // Verifica se hoje é segunda-feira (DayOfWeek.MONDAY tem valor 1)
+            if (today.dayOfWeek.value == 1) {
+                today
+            } else {
+                // Calcula a próxima segunda-feira
+                today.plusDays((8 - today.dayOfWeek.value).toLong())
+            }
         }
 
-        val endDate = startDate.plusWeeks(request.planDuration.toLong())
+        // Determina o dia final da semana baseado na quantidade de dias de treino
+        val lastDayOfWeek = if (request.athleteData.disponibilidade == 6) {
+            6  // Sábado para quem treina 6 dias
+        } else {
+            5  // Sexta-feira para quem treina 3, 4 ou 5 dias
+        }
+
+        // Cálculo para endDate - termina no dia determinado da última semana
+        val lastWeekStart = startDate.plusWeeks(request.planDuration.toLong() - 1)
+        val endDate = lastWeekStart.plusDays((lastDayOfWeek - lastWeekStart.dayOfWeek.value).let {
+            if (it >= 0) it else it + 7
+        }.toLong())
 
         // Criar plano pendente de pagamento
         val trainingPlan = TrainingPlan(

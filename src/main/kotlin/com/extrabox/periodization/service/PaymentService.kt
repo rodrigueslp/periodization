@@ -208,6 +208,14 @@ class PaymentService(
         }
     }
 
+    fun canSimulatePayment(userEmail: String): Boolean {
+        val user = userRepository.findByEmail(userEmail)
+            .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
+
+        // Verifica se o usuário tem a role necessária
+        return user.roles.any { it.name == "ROLE_PAYMENT_TESTER" || it.name == "ROLE_ADMIN" }
+    }
+
     @Transactional
     fun processWebhook(data: Map<String, Any>): String {
         logger.info("Webhook recebido: $data")
@@ -440,6 +448,11 @@ class PaymentService(
     fun simulatePaymentApproval(externalReference: String, userEmail: String): String {
         val user = userRepository.findByEmail(userEmail)
             .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
+
+        // Verifica permissão para simular pagamentos
+        if (!canSimulatePayment(userEmail)) {
+            throw AccessDeniedException("Usuário não tem permissão para simular pagamentos")
+        }
 
         val payment = paymentRepository.findByExternalReference(externalReference)
             .orElseThrow { RuntimeException("Pagamento não encontrado com referência: $externalReference") }
