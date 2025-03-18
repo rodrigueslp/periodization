@@ -4,9 +4,7 @@ import com.extrabox.periodization.entity.BenchmarkData
 import com.extrabox.periodization.enums.PlanStatus
 import com.extrabox.periodization.entity.TrainingPlan
 import com.extrabox.periodization.messaging.PlanGenerationProducer
-import com.extrabox.periodization.model.PlanDetailsResponse
-import com.extrabox.periodization.model.PlanRequest
-import com.extrabox.periodization.model.PlanResponse
+import com.extrabox.periodization.model.*
 import com.extrabox.periodization.repository.BenchmarkDataRepository
 import com.extrabox.periodization.repository.TrainingPlanRepository
 import com.extrabox.periodization.repository.UserRepository
@@ -27,7 +25,8 @@ class PeriodizationService(
     private val benchmarkDataRepository: BenchmarkDataRepository,
     private val fileStorageService: FileStorageService,
     private val userRepository: UserRepository,
-    private val planGenerationProducer: PlanGenerationProducer
+    private val planGenerationProducer: PlanGenerationProducer,
+    private val pdfGenerationService: PdfGenerationService
 ) {
     private val logger = LoggerFactory.getLogger(PeriodizationService::class.java)
 
@@ -273,7 +272,57 @@ class PeriodizationService(
             throw AccessDeniedException("Acesso negado. Este plano não pertence ao usuário logado.")
         }
 
-        return fileStorageService.loadPdfFile(planId)
+        try {
+            // Tenta carregar o arquivo PDF existente
+            return fileStorageService.loadPdfFile(planId)
+        } catch (e: Exception) {
+            logger.info("PDF não encontrado para o plano $planId. Tentando gerar um novo PDF.")
+
+            // Verifica se o plano tem conteúdo para gerar um novo PDF
+            if (trainingPlan.planContent.isBlank()) {
+                throw RuntimeException("Não é possível gerar o PDF. O plano não possui conteúdo.")
+            }
+
+            // Constrói o objeto AthleteData com base no plano salvo
+            val athleteData = AthleteData(
+                nome = trainingPlan.athleteName,
+                idade = trainingPlan.athleteAge,
+                peso = trainingPlan.athleteWeight,
+                altura = trainingPlan.athleteHeight,
+                experiencia = trainingPlan.experienceLevel,
+                objetivo = trainingPlan.trainingGoal,
+                disponibilidade = trainingPlan.availability,
+                lesoes = trainingPlan.injuries,
+                historico = trainingPlan.trainingHistory,
+                objetivoDetalhado = trainingPlan.detailedGoal,
+                treinoPrincipal = trainingPlan.isMainTraining,
+                periodoTreino = trainingPlan.trainingPeriod,
+                benchmarks = benchmarkDataRepository.findByPlanId(planId).orElse(null)?.let {
+                    Benchmarks(
+                        backSquat = it.backSquat,
+                        deadlift = it.deadlift,
+                        clean = it.clean,
+                        snatch = it.snatch,
+                        fran = it.fran,
+                        grace = it.grace
+                    )
+                }
+            )
+
+            // Gera novo PDF usando o conteúdo existente
+            val pdfData = pdfGenerationService.generatePdf(athleteData, trainingPlan.planContent)
+
+            // Salva o novo PDF gerado
+            val pdfFilePath = fileStorageService.savePdfFile(planId, pdfData)
+
+            // Atualiza o caminho do PDF no plano
+            trainingPlan.pdfFilePath = pdfFilePath
+            trainingPlanRepository.save(trainingPlan)
+
+            logger.info("Novo PDF gerado com sucesso para o plano $planId")
+
+            return pdfData
+        }
     }
 
     fun getUserPlans(userEmail: String): List<PlanDetailsResponse> {
