@@ -280,13 +280,15 @@ class PeriodizationService(
         val user = userRepository.findByEmail(userEmail)
             .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
 
-        val plans = if (user.roles.any { it.name == "ROLE_ADMIN" }) {
-            // Administradores podem ver todos os planos
-            trainingPlanRepository.findTop10ByOrderByCreatedAtDesc()
-        } else {
-            // Usuários normais só veem seus próprios planos
-            trainingPlanRepository.findByUserOrderByCreatedAtDesc(user)
-        }
+//        val plans = if (user.roles.any { it.name == "ROLE_ADMIN" }) {
+//            // Administradores podem ver todos os planos
+//            trainingPlanRepository.findTop10ByOrderByCreatedAtDesc()
+//        } else {
+//            // Usuários normais só veem seus próprios planos
+//            trainingPlanRepository.findByUserOrderByCreatedAtDesc(user)
+//        }
+
+        val plans = trainingPlanRepository.findByUserOrderByCreatedAtDesc(user)
 
         return plans.map { plan ->
             val benchmarks = benchmarkDataRepository.findByPlanId(plan.planId).orElse(null)
