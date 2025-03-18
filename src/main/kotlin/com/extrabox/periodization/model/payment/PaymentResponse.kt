@@ -1,6 +1,7 @@
 package com.extrabox.periodization.model.payment
 
-// Modifique seu PaymentResponse.kt para incluir dados do PIX
+import java.time.LocalDateTime
+
 data class PaymentResponse(
     val paymentId: String,
     val preferenceId: String,
@@ -10,5 +11,12 @@ data class PaymentResponse(
     val createdAt: String,
     // Campos para PIX
     val pixCopiaECola: String? = null,
-    val qrCodeBase64: String? = null
+    val qrCodeBase64: String? = null,
+    // Campos adicionais para administrador
+    val amount: Double? = null,
+    val description: String? = null,
+    val userEmail: String? = null,
+    val userName: String? = null,
+    val planId: String? = null,
+    val updatedAt: String? = null
 )

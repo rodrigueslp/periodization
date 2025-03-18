@@ -62,10 +62,9 @@ class PaymentController(
     @GetMapping("/admin")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Listar todos os pagamentos", description = "Retorna todos os pagamentos (apenas para administradores)")
+    @SecurityRequirement(name = "bearerAuth")
     fun getAllPayments(): ResponseEntity<List<PaymentResponse>> {
-        // Implementar no PaymentService um método para listar todos os pagamentos
-        // Esta é apenas uma sugestão de endpoint para administrativo
-        val payments = listOf<PaymentResponse>() // Substituir pela chamada real
+        val payments = paymentService.getAllPayments()
         return ResponseEntity.ok(payments)
     }
 

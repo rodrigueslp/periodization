@@ -208,6 +208,26 @@ class PaymentService(
         }
     }
 
+    @Transactional(readOnly = true)
+    fun getAllPayments(): List<PaymentResponse> {
+        return paymentRepository.findAll().map { payment ->
+            PaymentResponse(
+                paymentId = payment.paymentId,
+                preferenceId = payment.preferenceId,
+                externalReference = payment.externalReference,
+                status = payment.status,
+                paymentUrl = "", // Não relevante para listagem admin
+                createdAt = payment.createdAt.format(DateTimeFormatter.ISO_DATE_TIME),
+                amount = payment.amount,
+                description = payment.description,
+                userEmail = payment.user?.email,
+                userName = payment.user?.fullName,
+                planId = payment.planId,
+                updatedAt = payment.updatedAt?.format(DateTimeFormatter.ISO_DATE_TIME)
+            )
+        }
+    }
+
     fun canSimulatePayment(userEmail: String): Boolean {
         val user = userRepository.findByEmail(userEmail)
             .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
@@ -421,7 +441,13 @@ class PaymentService(
                 externalReference = payment.externalReference,
                 status = payment.status,
                 paymentUrl = "", // Não é necessário URL para histórico
-                createdAt = payment.createdAt.format(DateTimeFormatter.ISO_DATE_TIME)
+                createdAt = payment.createdAt.format(DateTimeFormatter.ISO_DATE_TIME),
+                pixCopiaECola = null, // Apenas relevante na criação do pagamento
+                qrCodeBase64 = null, // Apenas relevante na criação do pagamento
+                amount = payment.amount,
+                description = payment.description,
+                planId = payment.planId
+                // userEmail e userName não são necessários quando o usuário lista seus próprios pagamentos
             )
         }
     }

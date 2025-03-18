@@ -1,5 +1,6 @@
 package com.extrabox.periodization.service
 
+import com.extrabox.periodization.entity.Role
 import com.extrabox.periodization.entity.UserFeedback
 import com.extrabox.periodization.model.FeedbackRequest
 import com.extrabox.periodization.model.FeedbackResponse
@@ -74,34 +75,32 @@ class FeedbackService(
         }
     }
 
+    @Transactional(readOnly = true)
     fun getAllFeedbacks(userEmail: String, type: String?): List<FeedbackResponse> {
         // Verificar se o usuário é admin
         val user = userRepository.findByEmail(userEmail)
             .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
 
-        if (!user.roles.any { it.name == "ROLE_ADMIN" }) {
+        if (!user.roles.any { it.name == Role.ROLE_ADMIN }) {
             throw AccessDeniedException("Apenas administradores podem acessar todos os feedbacks")
         }
 
-        // Buscar todos os feedbacks, filtrados por tipo se fornecido
+        // Buscar feedbacks, filtrados por tipo se especificado
         val feedbacks = if (type != null) {
             userFeedbackRepository.findByFeedbackTypeOrderByCreatedAtDesc(type)
         } else {
             userFeedbackRepository.findAllByOrderByCreatedAtDesc()
         }
 
-        // Mapear para resposta
+        // Converter para FeedbackResponse
         return feedbacks.map { feedback ->
             FeedbackResponse(
-                id = feedback.id!!,
+                id = feedback.id ?: 0,
                 feedbackText = feedback.feedbackText,
                 feedbackType = feedback.feedbackType,
-                createdAt = feedback.createdAt.format(
-                    DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
-                        .withLocale(Locale.of("pt", "BR"))
-                ),
-                userName = feedback.user?.fullName ?: "Usuário Desconhecido",
-                userEmail = feedback.user?.email ?: "email@desconhecido.com",
+                createdAt = feedback.createdAt.format(DateTimeFormatter.ISO_DATE_TIME),
+                userName = feedback.user?.fullName ?: "Anônimo",
+                userEmail = feedback.user?.email ?: "anônimo@email.com",
                 planId = feedback.planId
             )
         }

@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.web.bind.annotation.*
@@ -41,7 +42,9 @@ class FeedbackController(
     }
 
     @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Obter todos os feedbacks", description = "Retorna todos os feedbacks dos usuários (apenas para administradores)")
+    @SecurityRequirement(name = "bearerAuth")
     fun getAllFeedbacks(
         @AuthenticationPrincipal userDetails: UserDetails,
         @RequestParam(required = false) type: String?
