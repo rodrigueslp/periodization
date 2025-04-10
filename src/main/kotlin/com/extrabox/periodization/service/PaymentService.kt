@@ -5,6 +5,7 @@ import com.extrabox.periodization.enums.PlanStatus
 import com.extrabox.periodization.model.payment.PaymentRequest
 import com.extrabox.periodization.model.payment.PaymentResponse
 import com.extrabox.periodization.repository.PaymentRepository
+import com.extrabox.periodization.repository.StrengthTrainingPlanRepository
 import com.extrabox.periodization.repository.TrainingPlanRepository
 import com.extrabox.periodization.repository.UserRepository
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -28,6 +29,7 @@ class PaymentService(
     private val userRepository: UserRepository,
     private val paymentRepository: PaymentRepository,
     private val trainingPlanRepository: TrainingPlanRepository,
+    private val strengthTrainingPlanRepository: StrengthTrainingPlanRepository,
     private val userService: UserService,
 
     @Value("\${mercado-pago.access-token}")
@@ -458,11 +460,17 @@ class PaymentService(
     @Transactional
     fun updatePlanStatus(planId: String, status: PlanStatus) {
         try {
-            val trainingPlan = trainingPlanRepository.findByPlanId(planId)
-                .orElseThrow { RuntimeException("Plano não encontrado com o ID: $planId") }
-
-            trainingPlan.status = status
-            trainingPlanRepository.save(trainingPlan)
+            val trainingPlanOptional = trainingPlanRepository.findByPlanId(planId)
+            if (trainingPlanOptional.isPresent) {
+                val trainingPlan = trainingPlanOptional.get()
+                trainingPlan.status = status
+                trainingPlanRepository.save(trainingPlan)
+            } else {
+                val strengthPlan = strengthTrainingPlanRepository.findByPlanId(planId)
+                    .orElseThrow { RuntimeException("Plano não encontrado com o ID: $planId") }
+                strengthPlan.status = status
+                strengthTrainingPlanRepository.save(strengthPlan)
+            }
             logger.info("Status do plano $planId atualizado para $status")
         } catch (e: Exception) {
             logger.error("Erro ao atualizar status do plano $planId: ${e.message}", e)
