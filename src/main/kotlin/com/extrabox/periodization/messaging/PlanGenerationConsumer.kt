@@ -79,8 +79,8 @@ class PlanGenerationConsumer(
             logger.info("Conteúdo gerado com sucesso para plano ${message.planId}")
 
             // Criar planilha Excel
-            val excelData = createExcelWorkbook(athleteData, planContent)
-            val excelFilePath = fileStorageService.saveFile(message.planId, excelData)
+//            val excelData = createExcelWorkbook(athleteData, planContent)
+//            val excelFilePath = fileStorageService.saveFile(message.planId, excelData)
 
             // Criar arquivo PDF - Novo código
             val pdfData = pdfGenerationService.generatePdf(athleteData, planContent)
@@ -88,7 +88,7 @@ class PlanGenerationConsumer(
 
             // Atualizar o plano com o conteúdo gerado
             trainingPlan.planContent = planContent
-            trainingPlan.excelFilePath = excelFilePath
+            trainingPlan.excelFilePath = ""
             trainingPlan.pdfFilePath = pdfFilePath  // Atualizar com o caminho do PDF
             trainingPlan.status = PlanStatus.COMPLETED
             trainingPlanRepository.save(trainingPlan)
@@ -111,77 +111,4 @@ class PlanGenerationConsumer(
         }
     }
 
-    private fun createExcelWorkbook(athleteData: AthleteData, planContent: String): ByteArray {
-        val workbook = XSSFWorkbook()
-
-        // Criar folha de informações do atleta
-        val infoSheet = workbook.createSheet("Informações do Atleta")
-
-        var rowIndex = 0
-
-        // Título
-        var row = infoSheet.createRow(rowIndex++)
-        var cell = row.createCell(0)
-        cell.setCellValue("PLANO DE PERIODIZAÇÃO DE CROSSFIT")
-
-        // Espaço
-        rowIndex++
-
-        // Informações do atleta
-        row = infoSheet.createRow(rowIndex++)
-        row.createCell(0).setCellValue("Nome:")
-        row.createCell(1).setCellValue(athleteData.nome)
-
-        row = infoSheet.createRow(rowIndex++)
-        row.createCell(0).setCellValue("Idade:")
-        row.createCell(1).setCellValue(athleteData.idade.toString() + " anos")
-
-        row = infoSheet.createRow(rowIndex++)
-        row.createCell(0).setCellValue("Peso:")
-        row.createCell(1).setCellValue(athleteData.peso.toString() + " kg")
-
-        row = infoSheet.createRow(rowIndex++)
-        row.createCell(0).setCellValue("Altura:")
-        row.createCell(1).setCellValue(athleteData.altura.toString() + " cm")
-
-        row = infoSheet.createRow(rowIndex++)
-        row.createCell(0).setCellValue("Experiência:")
-        row.createCell(1).setCellValue(athleteData.experiencia)
-
-        row = infoSheet.createRow(rowIndex++)
-        row.createCell(0).setCellValue("Objetivo:")
-        row.createCell(1).setCellValue(athleteData.objetivo)
-
-        row = infoSheet.createRow(rowIndex++)
-        row.createCell(0).setCellValue("Disponibilidade:")
-        row.createCell(1).setCellValue(athleteData.disponibilidade.toString() + " dias por semana")
-
-        // Criar folha de plano de treinamento
-        val planSheet = workbook.createSheet("Plano de Treinamento")
-
-        rowIndex = 0
-        row = planSheet.createRow(rowIndex++)
-        cell = row.createCell(0)
-        cell.setCellValue("PLANO DE TREINAMENTO")
-
-        // Adicionar o conteúdo do plano
-        val lines = planContent.split("\n")
-        for (line in lines) {
-            row = planSheet.createRow(rowIndex++)
-            cell = row.createCell(0)
-            cell.setCellValue(line)
-        }
-
-        // Ajustar largura das colunas
-        infoSheet.autoSizeColumn(0)
-        infoSheet.autoSizeColumn(1)
-        planSheet.autoSizeColumn(0)
-
-        // Converter o workbook para ByteArray
-        val outputStream = ByteArrayOutputStream()
-        workbook.write(outputStream)
-        workbook.close()
-
-        return outputStream.toByteArray()
-    }
 }
