@@ -3,7 +3,7 @@ package com.extrabox.periodization.model
 data class AnthropicRequest(
     val model: String,
     val messages: List<Message>,
-    val max_tokens: Int = 12000,
+    val max_tokens: Int = 20000,
     val temperature: Double = 0.7,
     val system: String? = null
 )
