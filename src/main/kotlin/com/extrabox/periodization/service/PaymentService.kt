@@ -20,9 +20,11 @@ import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.annotation.Isolation
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class PaymentService(
@@ -43,12 +45,71 @@ class PaymentService(
     private val objectMapper = ObjectMapper()
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
-    @Transactional
+    // Cache para prevenir criação de pagamentos duplicados
+    private val processingPayments = ConcurrentHashMap<String, Long>()
+
+    @Transactional(isolation = Isolation.REPEATABLE_READ)
     fun createPayment(request: PaymentRequest, userEmail: String): PaymentResponse {
         val user = userRepository.findByEmail(userEmail)
             .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
 
-        // Referência externa única para este pagamento
+        val lockKey = "${request.planId}-${userEmail}"
+        val currentTime = System.currentTimeMillis()
+
+        // Verificar se já está sendo processado (proteção contra duplo clique/requisições simultâneas)
+        val existingProcessTime = processingPayments.putIfAbsent(lockKey, currentTime)
+        if (existingProcessTime != null) {
+            val timeDiff = currentTime - existingProcessTime
+            if (timeDiff < 5000) { // 5 segundos de proteção
+                logger.warn("Tentativa de criação de pagamento duplicado detectada para plano ${request.planId}. Diferença de tempo: ${timeDiff}ms")
+                throw RuntimeException("Pagamento já está sendo processado. Aguarde alguns segundos.")
+            } else {
+                // Se passou muito tempo, substitui o lock
+                processingPayments[lockKey] = currentTime
+            }
+        }
+
+        try {
+            // Buscar pagamentos existentes para este plano
+            val existingPayments = paymentRepository.findByPlanId(request.planId)
+
+            // Verificar se existe pagamento recente não-finalizado
+            val recentPendingPayment = existingPayments
+                .filter { it.status.lowercase() in listOf("pending", "in_process", "in_mediation") }
+                .maxByOrNull { it.createdAt }
+
+            if (recentPendingPayment != null) {
+                val minutesAgo = java.time.Duration.between(recentPendingPayment.createdAt, LocalDateTime.now()).toMinutes()
+
+                if (minutesAgo < 10) { // Se foi criado há menos de 10 minutos
+                    logger.info("Retornando pagamento pendente existente para plano ${request.planId} (criado há $minutesAgo minutos)")
+
+                    return PaymentResponse(
+                        paymentId = recentPendingPayment.paymentId,
+                        preferenceId = recentPendingPayment.preferenceId,
+                        externalReference = recentPendingPayment.externalReference,
+                        status = recentPendingPayment.status,
+                        paymentUrl = "",
+                        createdAt = recentPendingPayment.createdAt.format(DateTimeFormatter.ISO_DATE_TIME),
+                        pixCopiaECola = null, // Poderia buscar novamente se necessário
+                        qrCodeBase64 = null
+                    )
+                }
+            }
+
+            // Se chegou aqui, pode criar um novo pagamento
+            return createNewPayment(request, user)
+
+        } finally {
+            // Remover o lock após 30 segundos (cleanup assíncrono)
+            Thread {
+                Thread.sleep(30000)
+                processingPayments.remove(lockKey, currentTime)
+            }.start()
+        }
+    }
+
+    private fun createNewPayment(request: PaymentRequest, user: com.extrabox.periodization.entity.User): PaymentResponse {
         val externalReference = UUID.randomUUID().toString()
 
         try {
@@ -56,157 +117,161 @@ class PaymentService(
             val isPix = request.paymentMethod == "pix" || request.paymentMethod == null
 
             if (isPix) {
-                // Configurar dados para pagamento PIX
-                val paymentJson = """
-                    {
-                        "transaction_amount": ${request.amount},
-                        "description": "${request.description}",
-                        "payment_method_id": "pix",
-                        "payer": {
-                            "email": "${user.email}"
-                        },
-                        "external_reference": "$externalReference"
-                    }
-                """.trimIndent()
-
-                // Criar a requisição para pagamento PIX no Mercado Pago
-                val pixRequest = Request.Builder()
-                    .url("https://api.mercadopago.com/v1/payments")
-                    .addHeader("Authorization", "Bearer $mercadoPagoAccessToken")
-                    .addHeader("Content-Type", "application/json")
-                    .addHeader("X-Idempotency-Key", UUID.randomUUID().toString())
-                    .post(paymentJson.toRequestBody(jsonMediaType))
-                    .build()
-
-                client.newCall(pixRequest).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        val errorBody = response.body?.string() ?: "Sem detalhes"
-                        logger.error("Erro na API do Mercado Pago (PIX): $errorBody")
-                        throw RuntimeException("Erro ao criar pagamento PIX: ${response.code} - $errorBody")
-                    }
-
-                    // Ler a resposta
-                    val responseBody = response.body?.string()
-                        ?: throw RuntimeException("Corpo da resposta vazio")
-
-                    val paymentResult = objectMapper.readValue<Map<String, Any>>(responseBody)
-                    val paymentId = paymentResult["id"].toString()
-                    val status = paymentResult["status"] as String
-
-                    // Extrair dados do PIX
-                    val pointOfInteraction = paymentResult["point_of_interaction"] as? Map<String, Any>
-                    val transactionData = pointOfInteraction?.get("transaction_data") as? Map<String, Any>
-
-                    val pixCopiaECola = transactionData?.get("qr_code") as? String
-                    val qrCodeBase64 = transactionData?.get("qr_code_base64") as? String
-
-                    // Persistir o pagamento no banco de dados
-                    val payment = Payment(
-                        paymentId = paymentId,
-                        preferenceId = "", // PIX não usa preferenceId
-                        externalReference = externalReference,
-                        amount = request.amount,
-                        status = status,
-                        description = request.description,
-                        user = user,
-                        planId = request.planId
-                    )
-
-                    paymentRepository.save(payment)
-
-                    return PaymentResponse(
-                        paymentId = paymentId,
-                        preferenceId = "",
-                        externalReference = externalReference,
-                        status = status,
-                        paymentUrl = "",
-                        createdAt = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME),
-                        pixCopiaECola = pixCopiaECola,
-                        qrCodeBase64 = qrCodeBase64
-                    )
-                }
+                return createPixPayment(request, user, externalReference)
             } else {
-                // Configuração para Checkout Pro (cartão de crédito, etc)
-                val preferenceJson = """
-                    {
-                        "items": [
-                            {
-                                "title": "${request.description}",
-                                "quantity": 1,
-                                "currency_id": "BRL",
-                                "unit_price": ${request.amount}
-                            }
-                        ],
-                        "external_reference": "$externalReference",
-                        "back_urls": {
-                            "success": "$frontendUrl/payment/success",
-                            "pending": "$frontendUrl/payment/pending",
-                            "failure": "$frontendUrl/payment/failure"
-                        },
-                        "auto_return": "approved",
-                        "payment_methods": {
-                            "excluded_payment_types": [
-                                {"id": "ticket"}
-                            ],
-                            "installments": 1
-                        },
-                        "statement_descriptor": "Periodização CrossFit",
-                        "notification_url": "$frontendUrl/api/payments/webhook"
-                    }
-                """.trimIndent()
-
-                // Criar a requisição para o Checkout Pro no Mercado Pago
-                val checkoutRequest = Request.Builder()
-                    .url("https://api.mercadopago.com/checkout/preferences")
-                    .addHeader("Authorization", "Bearer $mercadoPagoAccessToken")
-                    .addHeader("Content-Type", "application/json")
-                    .addHeader("X-Idempotency-Key", UUID.randomUUID().toString())
-                    .post(preferenceJson.toRequestBody(jsonMediaType))
-                    .build()
-
-                client.newCall(checkoutRequest).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        val errorBody = response.body?.string() ?: "Sem detalhes"
-                        logger.error("Erro na API do Mercado Pago (Checkout): $errorBody")
-                        throw RuntimeException("Erro ao criar preferência: ${response.code} - $errorBody")
-                    }
-
-                    // Ler a resposta
-                    val responseBody = response.body?.string()
-                        ?: throw RuntimeException("Corpo da resposta vazio")
-
-                    val preference = objectMapper.readValue<Map<String, Any>>(responseBody)
-                    val preferenceId = preference["id"] as String
-                    val initPoint = preference["init_point"] as String
-
-                    // Registrar o pagamento no banco
-                    val payment = Payment(
-                        paymentId = UUID.randomUUID().toString(), // ID temporário
-                        preferenceId = preferenceId,
-                        externalReference = externalReference,
-                        amount = request.amount,
-                        status = "PENDING",
-                        description = request.description,
-                        user = user,
-                        planId = request.planId
-                    )
-
-                    paymentRepository.save(payment)
-
-                    // Retornar resposta com URL de pagamento
-                    return PaymentResponse(
-                        paymentId = payment.paymentId,
-                        preferenceId = preferenceId,
-                        externalReference = externalReference,
-                        status = "PENDING",
-                        paymentUrl = initPoint,
-                        createdAt = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME)
-                    )
-                }
+                return createCheckoutProPayment(request, user, externalReference)
             }
         } catch (e: Exception) {
             logger.error("Erro ao criar pagamento: ${e.message}", e)
             throw RuntimeException("Erro ao processar pagamento: ${e.message}")
+        }
+    }
+
+    private fun createPixPayment(request: PaymentRequest, user: com.extrabox.periodization.entity.User, externalReference: String): PaymentResponse {
+        val paymentJson = """
+            {
+                "transaction_amount": ${request.amount},
+                "description": "${request.description}",
+                "payment_method_id": "pix",
+                "payer": {
+                    "email": "${user.email}"
+                },
+                "external_reference": "$externalReference"
+            }
+        """.trimIndent()
+
+        val pixRequest = Request.Builder()
+            .url("https://api.mercadopago.com/v1/payments")
+            .addHeader("Authorization", "Bearer $mercadoPagoAccessToken")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("X-Idempotency-Key", UUID.randomUUID().toString())
+            .post(paymentJson.toRequestBody(jsonMediaType))
+            .build()
+
+        client.newCall(pixRequest).execute().use { response ->
+            if (!response.isSuccessful) {
+                val errorBody = response.body?.string() ?: "Sem detalhes"
+                logger.error("Erro na API do Mercado Pago (PIX): $errorBody")
+                throw RuntimeException("Erro ao criar pagamento PIX: ${response.code} - $errorBody")
+            }
+
+            val responseBody = response.body?.string()
+                ?: throw RuntimeException("Corpo da resposta vazio")
+
+            val paymentResult = objectMapper.readValue<Map<String, Any>>(responseBody)
+            val paymentId = paymentResult["id"].toString()
+            val status = paymentResult["status"] as String
+
+            val pointOfInteraction = paymentResult["point_of_interaction"] as? Map<String, Any>
+            val transactionData = pointOfInteraction?.get("transaction_data") as? Map<String, Any>
+
+            val pixCopiaECola = transactionData?.get("qr_code") as? String
+            val qrCodeBase64 = transactionData?.get("qr_code_base64") as? String
+
+            // Persistir o pagamento no banco de dados
+            val payment = Payment(
+                paymentId = paymentId,
+                preferenceId = "",
+                externalReference = externalReference,
+                amount = request.amount,
+                status = status,
+                description = request.description,
+                user = user,
+                planId = request.planId
+            )
+
+            paymentRepository.save(payment)
+
+            logger.info("Pagamento PIX criado: $paymentId para plano ${request.planId}")
+
+            return PaymentResponse(
+                paymentId = paymentId,
+                preferenceId = "",
+                externalReference = externalReference,
+                status = status,
+                paymentUrl = "",
+                createdAt = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME),
+                pixCopiaECola = pixCopiaECola,
+                qrCodeBase64 = qrCodeBase64
+            )
+        }
+    }
+
+    private fun createCheckoutProPayment(request: PaymentRequest, user: com.extrabox.periodization.entity.User, externalReference: String): PaymentResponse {
+        val preferenceJson = """
+            {
+                "items": [
+                    {
+                        "title": "${request.description}",
+                        "quantity": 1,
+                        "currency_id": "BRL",
+                        "unit_price": ${request.amount}
+                    }
+                ],
+                "external_reference": "$externalReference",
+                "back_urls": {
+                    "success": "$frontendUrl/payment/success",
+                    "pending": "$frontendUrl/payment/pending",
+                    "failure": "$frontendUrl/payment/failure"
+                },
+                "auto_return": "approved",
+                "payment_methods": {
+                    "excluded_payment_types": [
+                        {"id": "ticket"}
+                    ],
+                    "installments": 1
+                },
+                "statement_descriptor": "Periodização CrossFit",
+                "notification_url": "$frontendUrl/api/payments/webhook"
+            }
+        """.trimIndent()
+
+        val checkoutRequest = Request.Builder()
+            .url("https://api.mercadopago.com/checkout/preferences")
+            .addHeader("Authorization", "Bearer $mercadoPagoAccessToken")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("X-Idempotency-Key", UUID.randomUUID().toString())
+            .post(preferenceJson.toRequestBody(jsonMediaType))
+            .build()
+
+        client.newCall(checkoutRequest).execute().use { response ->
+            if (!response.isSuccessful) {
+                val errorBody = response.body?.string() ?: "Sem detalhes"
+                logger.error("Erro na API do Mercado Pago (Checkout): $errorBody")
+                throw RuntimeException("Erro ao criar preferência: ${response.code} - $errorBody")
+            }
+
+            val responseBody = response.body?.string()
+                ?: throw RuntimeException("Corpo da resposta vazio")
+
+            val preference = objectMapper.readValue<Map<String, Any>>(responseBody)
+            val preferenceId = preference["id"] as String
+            val initPoint = preference["init_point"] as String
+
+            // Registrar o pagamento no banco
+            val payment = Payment(
+                paymentId = UUID.randomUUID().toString(),
+                preferenceId = preferenceId,
+                externalReference = externalReference,
+                amount = request.amount,
+                status = "pending",
+                description = request.description,
+                user = user,
+                planId = request.planId
+            )
+
+            paymentRepository.save(payment)
+
+            logger.info("Pagamento Checkout Pro criado: $preferenceId para plano ${request.planId}")
+
+            return PaymentResponse(
+                paymentId = payment.paymentId,
+                preferenceId = preferenceId,
+                externalReference = externalReference,
+                status = "pending",
+                paymentUrl = initPoint,
+                createdAt = LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME)
+            )
         }
     }
 
@@ -218,7 +283,7 @@ class PaymentService(
                 preferenceId = payment.preferenceId,
                 externalReference = payment.externalReference,
                 status = payment.status,
-                paymentUrl = "", // Não relevante para listagem admin
+                paymentUrl = "",
                 createdAt = payment.createdAt.format(DateTimeFormatter.ISO_DATE_TIME),
                 amount = payment.amount,
                 description = payment.description,
@@ -234,7 +299,6 @@ class PaymentService(
         val user = userRepository.findByEmail(userEmail)
             .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
 
-        // Verifica se o usuário tem a role necessária
         return user.roles.any { it.name == "ROLE_PAYMENT_TESTER" || it.name == "ROLE_ADMIN" }
     }
 
@@ -243,14 +307,12 @@ class PaymentService(
         logger.info("Webhook recebido: $data")
 
         try {
-            // Extrair dados da notificação
             val type = data["type"] as? String ?: return "Tipo de notificação desconhecido"
             val dataInfo = data["data"] as? Map<String, Any> ?: return "Dados da notificação inválidos"
 
             if (type == "payment") {
                 val paymentId = dataInfo["id"] as? String ?: return "ID de pagamento não encontrado"
 
-                // Obter detalhes do pagamento
                 val paymentRequest = Request.Builder()
                     .url("https://api.mercadopago.com/v1/payments/$paymentId")
                     .addHeader("Authorization", "Bearer $mercadoPagoAccessToken")
@@ -270,21 +332,31 @@ class PaymentService(
                     val externalReference = paymentData["external_reference"] as? String
                         ?: return "Referência externa não encontrada"
 
-                    // Buscar pagamento no banco de dados
-                    val payment = externalReference.let { ref ->
-                        paymentRepository.findByExternalReference(ref)
-                            .orElse(null) ?: return "Pagamento não encontrado com referência: $ref"
+                    logger.info("Processando webhook - PaymentId: $paymentId, Status: $status, ExternalRef: $externalReference")
+
+                    // Buscar primeiro por paymentId, depois por external_reference
+                    val payment = paymentRepository.findByPaymentId(paymentId).orElse(null)
+                        ?: paymentRepository.findByExternalReference(externalReference).orElse(null)
+                        ?: run {
+                            logger.error("Pagamento não encontrado - PaymentId: $paymentId, ExternalRef: $externalReference")
+                            return "Pagamento não encontrado"
+                        }
+
+                    logger.info("Pagamento encontrado no banco: ${payment.id}, Status atual: ${payment.status}")
+
+                    // Verificar se já foi processado para evitar processamento duplicado
+                    if (payment.status == "approved" && status == "approved") {
+                        logger.info("Pagamento $paymentId já foi processado anteriormente")
+                        return "Pagamento já processado"
                     }
 
-                    // Se vier do Checkout Pro, atualizar paymentId
-                    if (payment.paymentId.length < 10) {
-                        payment.paymentId = paymentId
-                    }
-
-                    // Atualizar status
+                    // Atualizar dados do pagamento
+                    payment.paymentId = paymentId
                     payment.status = status
                     payment.updatedAt = LocalDateTime.now()
                     paymentRepository.save(payment)
+
+                    logger.info("Status do pagamento atualizado: ${payment.externalReference} -> $status")
 
                     // Se aprovado, atualizar assinatura do usuário e status do plano
                     if (status == "approved") {
@@ -293,9 +365,9 @@ class PaymentService(
                             userService.updateSubscription(user.email, "SINGLE_PLAN", 1)
                             logger.info("Assinatura ativada para usuário: ${user.email}")
 
-                            // Atualizar status do plano se tiver planId
                             payment.planId?.let { planId ->
                                 updatePlanStatus(planId, PlanStatus.PAYMENT_APPROVED)
+                                logger.info("Status do plano $planId atualizado para PAYMENT_APPROVED")
                             }
                         }
                     }
@@ -318,19 +390,15 @@ class PaymentService(
         val payment = paymentRepository.findByExternalReference(externalReference)
             .orElseThrow { RuntimeException("Pagamento não encontrado com referência: $externalReference") }
 
-        // Verificar se o pagamento pertence ao usuário
         if (payment.user?.id != user.id && !user.roles.any { it.name == "ROLE_ADMIN" }) {
             throw AccessDeniedException("Este pagamento não pertence ao usuário logado")
         }
 
-        // Se o pagamento já estiver aprovado, retornar status atual
         if (payment.status == "approved") {
             return payment.status
         }
 
-        // Consultar status atual no Mercado Pago
         try {
-            // Se for PIX, consultar diretamente
             if (payment.paymentId.length > 5) {
                 val request = Request.Builder()
                     .url("https://api.mercadopago.com/v1/payments/${payment.paymentId}")
@@ -347,17 +415,13 @@ class PaymentService(
                     val paymentData = objectMapper.readValue<Map<String, Any>>(responseBody)
                     val currentStatus = paymentData["status"] as String
 
-                    // Atualizar status no banco de dados se diferente
                     if (currentStatus != payment.status) {
                         payment.status = currentStatus
                         payment.updatedAt = LocalDateTime.now()
                         paymentRepository.save(payment)
 
-                        // Se aprovado, atualizar assinatura do usuário e status do plano
                         if (currentStatus == "approved") {
                             userService.updateSubscription(user.email, "SINGLE_PLAN", 1)
-
-                            // Atualizar status do plano se tiver planId
                             payment.planId?.let { planId ->
                                 updatePlanStatus(planId, PlanStatus.PAYMENT_APPROVED)
                             }
@@ -367,60 +431,39 @@ class PaymentService(
                     return currentStatus
                 }
             } else if (payment.preferenceId.isNotEmpty()) {
-                // Para Checkout Pro, consultar por preferência
-                val request = Request.Builder()
-                    .url("https://api.mercadopago.com/checkout/preferences/${payment.preferenceId}")
+                val searchRequest = Request.Builder()
+                    .url("https://api.mercadopago.com/v1/payments/search?external_reference=${payment.externalReference}")
                     .addHeader("Authorization", "Bearer $mercadoPagoAccessToken")
                     .get()
                     .build()
 
-                client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) {
+                client.newCall(searchRequest).execute().use { searchResponse ->
+                    if (!searchResponse.isSuccessful) {
                         return payment.status
                     }
 
-                    val responseBody = response.body?.string() ?: return payment.status
+                    val searchBody = searchResponse.body?.string() ?: return payment.status
+                    val searchData = objectMapper.readValue<Map<String, Any>>(searchBody)
+                    val results = searchData["results"] as? List<Map<String, Any>> ?: return payment.status
 
-                    // As preferências não contêm o status de pagamento
-                    // Precisamos consultar pagamentos associados a essa preferência
-                    val searchRequest = Request.Builder()
-                        .url("https://api.mercadopago.com/v1/payments/search?external_reference=${payment.externalReference}")
-                        .addHeader("Authorization", "Bearer $mercadoPagoAccessToken")
-                        .get()
-                        .build()
+                    if (results.isNotEmpty()) {
+                        val latestPayment = results[0]
+                        val newPaymentId = latestPayment["id"].toString()
+                        val currentStatus = latestPayment["status"] as String
 
-                    client.newCall(searchRequest).execute().use { searchResponse ->
-                        if (!searchResponse.isSuccessful) {
-                            return payment.status
-                        }
+                        payment.paymentId = newPaymentId
+                        payment.status = currentStatus
+                        payment.updatedAt = LocalDateTime.now()
+                        paymentRepository.save(payment)
 
-                        val searchBody = searchResponse.body?.string() ?: return payment.status
-                        val searchData = objectMapper.readValue<Map<String, Any>>(searchBody)
-                        val results = searchData["results"] as? List<Map<String, Any>> ?: return payment.status
-
-                        if (results.isNotEmpty()) {
-                            val latestPayment = results[0]
-                            val newPaymentId = latestPayment["id"].toString()
-                            val currentStatus = latestPayment["status"] as String
-
-                            // Atualizar payment_id e status
-                            payment.paymentId = newPaymentId
-                            payment.status = currentStatus
-                            payment.updatedAt = LocalDateTime.now()
-                            paymentRepository.save(payment)
-
-                            // Se aprovado, atualizar assinatura do usuário e status do plano
-                            if (currentStatus == "approved") {
-                                userService.updateSubscription(user.email, "SINGLE_PLAN", 1)
-
-                                // Atualizar status do plano se tiver planId
-                                payment.planId?.let { planId ->
-                                    updatePlanStatus(planId, PlanStatus.PAYMENT_APPROVED)
-                                }
+                        if (currentStatus == "approved") {
+                            userService.updateSubscription(user.email, "SINGLE_PLAN", 1)
+                            payment.planId?.let { planId ->
+                                updatePlanStatus(planId, PlanStatus.PAYMENT_APPROVED)
                             }
-
-                            return currentStatus
                         }
+
+                        return currentStatus
                     }
                 }
             }
@@ -442,21 +485,17 @@ class PaymentService(
                 preferenceId = payment.preferenceId,
                 externalReference = payment.externalReference,
                 status = payment.status,
-                paymentUrl = "", // Não é necessário URL para histórico
+                paymentUrl = "",
                 createdAt = payment.createdAt.format(DateTimeFormatter.ISO_DATE_TIME),
-                pixCopiaECola = null, // Apenas relevante na criação do pagamento
-                qrCodeBase64 = null, // Apenas relevante na criação do pagamento
+                pixCopiaECola = null,
+                qrCodeBase64 = null,
                 amount = payment.amount,
                 description = payment.description,
                 planId = payment.planId
-                // userEmail e userName não são necessários quando o usuário lista seus próprios pagamentos
             )
         }
     }
 
-    /**
-     * Atualiza o status de um plano de treinamento
-     */
     @Transactional
     fun updatePlanStatus(planId: String, status: PlanStatus) {
         try {
@@ -483,7 +522,6 @@ class PaymentService(
         val user = userRepository.findByEmail(userEmail)
             .orElseThrow { UsernameNotFoundException("Usuário não encontrado com o email: $userEmail") }
 
-        // Verifica permissão para simular pagamentos
         if (!canSimulatePayment(userEmail)) {
             throw AccessDeniedException("Usuário não tem permissão para simular pagamentos")
         }
@@ -491,19 +529,34 @@ class PaymentService(
         val payment = paymentRepository.findByExternalReference(externalReference)
             .orElseThrow { RuntimeException("Pagamento não encontrado com referência: $externalReference") }
 
-        // Atualizar status para aprovado
         payment.status = "approved"
         payment.updatedAt = LocalDateTime.now()
         paymentRepository.save(payment)
 
-        // Atualizar assinatura do usuário
         userService.updateSubscription(user.email, "SINGLE_PLAN", 1)
 
-        // Atualizar status do plano se tiver planId
         payment.planId?.let { planId ->
             updatePlanStatus(planId, PlanStatus.PAYMENT_APPROVED)
         }
 
         return "approved"
+    }
+
+    // Método auxiliar para debug se necessário
+    fun getPaymentsByPlanId(planId: String): List<PaymentResponse> {
+        val payments = paymentRepository.findByPlanId(planId)
+        return payments.map { payment ->
+            PaymentResponse(
+                paymentId = payment.paymentId,
+                preferenceId = payment.preferenceId,
+                externalReference = payment.externalReference,
+                status = payment.status,
+                paymentUrl = "",
+                createdAt = payment.createdAt.format(DateTimeFormatter.ISO_DATE_TIME),
+                amount = payment.amount,
+                description = payment.description,
+                planId = payment.planId
+            )
+        }
     }
 }

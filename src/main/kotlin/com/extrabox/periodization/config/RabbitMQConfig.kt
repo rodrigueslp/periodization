@@ -14,28 +14,33 @@ import java.util.*
 @Configuration
 class RabbitMQConfig {
     companion object {
-        const val PLAN_GENERATION_QUEUE = "plan-generation-queue"
         const val PLAN_GENERATION_EXCHANGE = "plan-generation-exchange"
-        const val PLAN_GENERATION_ROUTING_KEY = "plan.generate"
+        const val PLAN_GENERATION_CROSSFIT_QUEUE = "plan-generation-crossfit-queue"
+        const val PLAN_GENERATION_STRENGTH_QUEUE = "plan-generation-strength-queue"
+
+        const val PLAN_GENERATION_CROSSFIT_ROUTING_KEY = "plan.crossfit.generate"
+        const val PLAN_GENERATION_STRENGTH_ROUTING_KEY = "plan.strength.generate"
     }
 
     @Bean
-    fun planGenerationQueue(): Queue {
-        return Queue(PLAN_GENERATION_QUEUE, true)
-    }
+    fun crossfitQueue() = Queue(PLAN_GENERATION_CROSSFIT_QUEUE)
 
     @Bean
-    fun planGenerationExchange(): TopicExchange {
-        return TopicExchange(PLAN_GENERATION_EXCHANGE)
-    }
+    fun strengthQueue() = Queue(PLAN_GENERATION_STRENGTH_QUEUE)
 
     @Bean
-    fun planGenerationBinding(queue: Queue, exchange: TopicExchange): Binding {
-        return BindingBuilder
-            .bind(queue)
-            .to(exchange)
-            .with(PLAN_GENERATION_ROUTING_KEY)
-    }
+    fun planExchange() = TopicExchange(PLAN_GENERATION_EXCHANGE)
+
+    @Bean
+    fun bindCrossfit() = BindingBuilder.bind(crossfitQueue())
+        .to(planExchange())
+        .with(PLAN_GENERATION_CROSSFIT_ROUTING_KEY)
+
+    @Bean
+    fun bindStrength() = BindingBuilder.bind(strengthQueue())
+        .to(planExchange())
+        .with(PLAN_GENERATION_STRENGTH_ROUTING_KEY)
+
 
     @Bean
     fun jsonMessageConverter(): Jackson2JsonMessageConverter {

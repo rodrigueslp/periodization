@@ -6,5 +6,5 @@ import java.io.Serializable
 data class PlanGenerationMessage(
     val planId: String,
     val userEmail: String,
-    val planType: PlanType = PlanType.CROSSFIT // Padrão para compatibilidade com código existente
+    val planType: PlanType // Padrão para compatibilidade com código existente
 ) : Serializable

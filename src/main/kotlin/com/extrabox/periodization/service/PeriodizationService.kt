@@ -3,6 +3,7 @@ package com.extrabox.periodization.service
 import com.extrabox.periodization.entity.BenchmarkData
 import com.extrabox.periodization.enums.PlanStatus
 import com.extrabox.periodization.entity.TrainingPlan
+import com.extrabox.periodization.enums.PlanType
 import com.extrabox.periodization.messaging.PlanGenerationProducer
 import com.extrabox.periodization.model.*
 import com.extrabox.periodization.repository.BenchmarkDataRepository
@@ -143,7 +144,7 @@ class PeriodizationService(
 
             // Enviar mensagem para o RabbitMQ
             logger.info("Enviando plano $planId para a fila de geração")
-            planGenerationProducer.sendPlanGenerationRequest(planId, userEmail)
+            planGenerationProducer.sendPlanGenerationRequest(planId, userEmail, PlanType.CROSSFIT)
 
             return PlanResponse(
                 planId = planId,

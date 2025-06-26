@@ -2,6 +2,7 @@ package com.extrabox.periodization.messaging
 
 import com.extrabox.periodization.config.RabbitMQConfig
 import com.extrabox.periodization.enums.PlanStatus
+import com.extrabox.periodization.enums.PlanType
 import com.extrabox.periodization.model.AthleteData
 import com.extrabox.periodization.model.Benchmarks
 import com.extrabox.periodization.model.messaging.PlanGenerationMessage
@@ -27,9 +28,15 @@ class PlanGenerationConsumer(
 ) {
     private val logger = LoggerFactory.getLogger(PlanGenerationConsumer::class.java)
 
-    @RabbitListener(queues = [RabbitMQConfig.PLAN_GENERATION_QUEUE])
+    @RabbitListener(queues = [RabbitMQConfig.PLAN_GENERATION_CROSSFIT_QUEUE])
     @Transactional
     fun processPlanGeneration(message: PlanGenerationMessage) {
+
+        // Ignorar mensagens que não são para treinos de musculação
+        if (message.planType != PlanType.CROSSFIT) {
+            return
+        }
+
         logger.info("Recebida mensagem para gerar plano: ${message.planId}, usuário: ${message.userEmail}")
 
         try {

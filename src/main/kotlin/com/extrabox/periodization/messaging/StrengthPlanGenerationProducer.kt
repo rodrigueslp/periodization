@@ -19,7 +19,7 @@ class StrengthPlanGenerationProducer(
 
         rabbitTemplate.convertAndSend(
             RabbitMQConfig.PLAN_GENERATION_EXCHANGE,
-            RabbitMQConfig.PLAN_GENERATION_ROUTING_KEY,
+            RabbitMQConfig.PLAN_GENERATION_CROSSFIT_ROUTING_KEY,
             message
         )
 

@@ -26,7 +26,7 @@ class StrengthPlanGenerationConsumer(
 ) {
     private val logger = LoggerFactory.getLogger(StrengthPlanGenerationConsumer::class.java)
 
-    @RabbitListener(queues = [RabbitMQConfig.PLAN_GENERATION_QUEUE])
+    @RabbitListener(queues = [RabbitMQConfig.PLAN_GENERATION_STRENGTH_QUEUE])
     @Transactional
     fun processPlanGeneration(message: PlanGenerationMessage) {
         // Ignorar mensagens que não são para treinos de musculação

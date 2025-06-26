@@ -3,6 +3,7 @@ package com.extrabox.periodization.service
 import com.extrabox.periodization.entity.StrengthTrainingPlan
 import com.extrabox.periodization.enums.PlanStatus
 import com.extrabox.periodization.enums.PlanType
+import com.extrabox.periodization.messaging.PlanGenerationProducer
 import com.extrabox.periodization.messaging.StrengthPlanGenerationProducer
 import com.extrabox.periodization.model.*
 import com.extrabox.periodization.repository.StrengthTrainingPlanRepository
@@ -23,7 +24,7 @@ class StrengthTrainingService(
     private val strengthTrainingPlanRepository: StrengthTrainingPlanRepository,
     private val fileStorageService: FileStorageService,
     private val userRepository: UserRepository,
-    private val strengthPlanGenerationProducer: StrengthPlanGenerationProducer,
+    private val planGenerationProducer: PlanGenerationProducer,
     private val pdfGenerationService: PdfGenerationService
 ) {
     private val logger = LoggerFactory.getLogger(StrengthTrainingService::class.java)
@@ -119,7 +120,7 @@ class StrengthTrainingService(
 
             // Enviar mensagem para o RabbitMQ
             logger.info("Enviando plano de musculação $planId para a fila de geração")
-            strengthPlanGenerationProducer.sendPlanGenerationRequest(planId, userEmail, PlanType.STRENGTH)
+            planGenerationProducer.sendPlanGenerationRequest(planId, userEmail, PlanType.STRENGTH)
 
             return StrengthPlanResponse(
                 planId = planId,
