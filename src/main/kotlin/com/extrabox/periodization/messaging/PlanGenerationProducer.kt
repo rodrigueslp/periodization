@@ -18,8 +18,9 @@ class PlanGenerationProducer(
         val message = PlanGenerationMessage(planId, userEmail, planType)
 
         val (routingKey, queue) = when (planType) {
-            PlanType.CROSSFIT -> "plan.crossfit.generate" to "plan-generation-crossfit-queue"
-            PlanType.STRENGTH -> "plan.strength.generate" to "plan-generation-strength-queue"
+            PlanType.CROSSFIT -> RabbitMQConfig.PLAN_GENERATION_CROSSFIT_ROUTING_KEY to RabbitMQConfig.PLAN_GENERATION_CROSSFIT_QUEUE
+            PlanType.STRENGTH -> RabbitMQConfig.PLAN_GENERATION_STRENGTH_ROUTING_KEY to RabbitMQConfig.PLAN_GENERATION_STRENGTH_QUEUE
+            PlanType.RUNNING -> RabbitMQConfig.PLAN_GENERATION_RUNNING_ROUTING_KEY to RabbitMQConfig.PLAN_GENERATION_RUNNING_QUEUE
         }
 
         rabbitTemplate.convertAndSend(
@@ -28,7 +29,6 @@ class PlanGenerationProducer(
             message
         )
 
-        logger.info("Requisição de geração enviada com sucesso: $planId")
+        logger.info("Requisição de geração enviada com sucesso: $planId para fila: $queue")
     }
-
 }
