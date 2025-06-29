@@ -34,6 +34,8 @@ ENV PORT=8080
 # - envsubst para resolver variáveis no newrelic.yml
 # - echo das variáveis e do newrelic.yml interpolado
 # - cat do log do agente após execução
+# (mantém todas as etapas anteriores...)
+
 ENTRYPOINT ["/bin/sh", "-c", "\
   echo '== Interpolando newrelic.yml com variáveis de ambiente ==' && \
   envsubst < /app/newrelic/newrelic.yml > /app/newrelic/newrelic-final.yml && \
@@ -45,6 +47,9 @@ ENTRYPOINT ["/bin/sh", "-c", "\
   echo '== INICIANDO APLICAÇÃO ==' && \
   java -javaagent:/app/newrelic/newrelic.jar \
        -Dnewrelic.config.file=/app/newrelic/newrelic-final.yml \
-       -jar /app/app.jar && \
-  echo '== LOG DO AGENTE NEW RELIC ==' && \
-  cat /app/newrelic/logs/newrelic_agent.log"]
+       -jar /app/app.jar & \
+  sleep 5 && \
+  echo '== LOG DO AGENTE NEW RELIC (PARCIAL) ==' && \
+  tail -n 50 /app/newrelic/logs/newrelic_agent.log && \
+  wait"]
+
