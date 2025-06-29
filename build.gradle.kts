@@ -32,6 +32,8 @@ dependencies {
 	implementation("com.squareup.okhttp3:okhttp:4.11.0")
 	implementation("org.postgresql:postgresql")
 
+	implementation("com.newrelic.agent.java:newrelic-api:8.21.0")
+
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 
 	implementation("org.springframework.boot:spring-boot-starter-amqp")
