@@ -9,7 +9,7 @@ COPY build.gradle.kts settings.gradle.kts ./
 COPY gradle ./gradle
 
 # Instala o Gradle (caso não tenha wrapper)
-RUN apk add --no-cache gradle
+RUN apk add --no-cache gradle gettext
 
 # Copia o código fonte
 COPY src ./src
@@ -20,31 +20,31 @@ RUN gradle bootJar --no-daemon
 # Move o .jar gerado para local conhecido
 RUN find /app/build/libs -name "*.jar" -exec mv {} /app/app.jar \; || echo "Jar not found"
 
-# Copia a pasta do New Relic (com o YAML contendo variáveis)
+# Copia a pasta do New Relic
 COPY newrelic/ /app/newrelic/
-
-# Adiciona suporte ao comando `envsubst` para interpolar variáveis de ambiente
-RUN apk add --no-cache gettext
 
 # Cria diretório adicional (se necessário pela app)
 RUN mkdir -p files
 
-# Exponha a porta (Railway define a PORT via env var)
+# Exponha a porta
 EXPOSE 8080
 ENV PORT=8080
 
 # Entrypoint com:
-# 1. Interpolação do newrelic.yml
-# 2. Prints no log para debug
-# 3. Execução da aplicação com o agente
+# - envsubst para resolver variáveis no newrelic.yml
+# - echo das variáveis e do newrelic.yml interpolado
+# - cat do log do agente após execução
 ENTRYPOINT ["/bin/sh", "-c", "\
-  echo 'Interpolando newrelic.yml com variáveis de ambiente...' && \
+  echo '== Interpolando newrelic.yml com variáveis de ambiente ==' && \
   envsubst < /app/newrelic/newrelic.yml > /app/newrelic/newrelic-final.yml && \
-  echo '===== VARIÁVEIS DE AMBIENTE =====' && \
+  echo '== VARIÁVEIS DE AMBIENTE ==' && \
   echo NEW_RELIC_LICENSE_KEY=$NEW_RELIC_LICENSE_KEY && \
-  echo '===== newrelic-final.yml =====' && \
+  echo NEW_RELIC_APP_NAME=$NEW_RELIC_APP_NAME && \
+  echo '== newrelic-final.yml ==' && \
   cat /app/newrelic/newrelic-final.yml && \
-  echo '===== INICIANDO APLICAÇÃO =====' && \
+  echo '== INICIANDO APLICAÇÃO ==' && \
   java -javaagent:/app/newrelic/newrelic.jar \
        -Dnewrelic.config.file=/app/newrelic/newrelic-final.yml \
-       -jar /app/app.jar"]
+       -jar /app/app.jar && \
+  echo '== LOG DO AGENTE NEW RELIC ==' && \
+  cat /app/newrelic/logs/newrelic_agent.log"]

@@ -18,7 +18,7 @@ common: &default_settings
   # app_name: My Application;My Application 2
   # This setting is required. Up to 3 different application names can be specified.
   # The first application name must be unique.
-  app_name: planilize
+  app_name: ${NEW_RELIC_APP_NAME}
 
   # ============================== LICENSE KEY ===============================
   # You must specify the license key associated with your New Relic
