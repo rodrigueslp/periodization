@@ -1,55 +1,48 @@
-# Use JDK 21 como imagem base
-FROM eclipse-temurin:21-jdk-alpine
+# Etapa de build com Gradle e New Relic
+FROM eclipse-temurin:21-jdk-alpine AS builder
 
-# Define o diretório de trabalho
 WORKDIR /app
 
-# Copia os arquivos gradle para resolução de dependências
+# Instala Gradle e ferramentas necessárias
+RUN apk add --no-cache gradle wget unzip ca-certificates && update-ca-certificates
+
+# Baixa e extrai o New Relic Java Agent
+RUN wget -O newrelic-java.zip https://download.newrelic.com/newrelic/java-agent/newrelic-agent/current/newrelic-java.zip \
+    && unzip -q newrelic-java.zip \
+    && rm newrelic-java.zip
+
+# Copia os arquivos de build
 COPY build.gradle.kts settings.gradle.kts ./
 COPY gradle ./gradle
-
-# Instala o Gradle (caso não tenha wrapper)
-RUN apk add --no-cache gradle gettext
-
-# Copia o código fonte
 COPY src ./src
 
-# Constrói a aplicação
+# Constrói o JAR
 RUN gradle bootJar --no-daemon
 
-# Move o .jar gerado para local conhecido
-RUN find /app/build/libs -name "*.jar" -exec mv {} /app/app.jar \; || echo "Jar not found"
+# Copia o jar final para o local padrão
+RUN find build/libs -name "*.jar" -exec cp {} app.jar \;
 
-# Copia a pasta do New Relic
-COPY newrelic/ /app/newrelic/
+# Etapa de runtime com JRE e agente do New Relic
+FROM eclipse-temurin:21-jre-alpine
 
-# Cria diretório adicional (se necessário pela app)
-RUN mkdir -p files
+WORKDIR /app
 
-# Exponha a porta
+# Instala dependências mínimas
+RUN apk add --no-cache ca-certificates && update-ca-certificates
+
+# Copia artefatos da etapa de build
+COPY --from=builder /app/app.jar ./app.jar
+COPY --from=builder /app/newrelic ./newrelic
+
+# (Opcional) Copia o seu arquivo newrelic.yml com variáveis de ambiente
+COPY newrelic.yml ./newrelic/newrelic.yml
+
+# Variáveis para New Relic (podem ser sobrescritas no Railway)
+#ENV NEW_RELIC_APP_NAME="PeriodizationApp"
+#ENV NEW_RELIC_LOG_LEVEL="info"
+
+# Exposição da porta
 EXPOSE 8080
-ENV PORT=8080
 
-# Entrypoint com:
-# - envsubst para resolver variáveis no newrelic.yml
-# - echo das variáveis e do newrelic.yml interpolado
-# - cat do log do agente após execução
-# (mantém todas as etapas anteriores...)
-
-ENTRYPOINT ["/bin/sh", "-c", "\
-  echo '== Interpolando newrelic.yml com variáveis de ambiente ==' && \
-  envsubst < /app/newrelic/newrelic.yml > /app/newrelic/newrelic-final.yml && \
-  echo '== VARIÁVEIS DE AMBIENTE ==' && \
-  echo NEW_RELIC_LICENSE_KEY=$NEW_RELIC_LICENSE_KEY && \
-  echo NEW_RELIC_APP_NAME=$NEW_RELIC_APP_NAME && \
-  echo '== newrelic-final.yml ==' && \
-  cat /app/newrelic/newrelic-final.yml && \
-  echo '== INICIANDO APLICAÇÃO ==' && \
-  java -javaagent:/app/newrelic/newrelic.jar \
-       -Dnewrelic.config.file=/app/newrelic/newrelic-final.yml \
-       -jar /app/app.jar & \
-  sleep 5 && \
-  echo '== LOG DO AGENTE NEW RELIC (PARCIAL) ==' && \
-  tail -n 50 /app/newrelic/logs/newrelic_agent.log && \
-  wait"]
-
+# Executa o app com o agente New Relic ativado
+ENTRYPOINT ["sh", "-c", "echo 'Iniciando app com New Relic...' && java -javaagent:/app/newrelic/newrelic.jar -jar app.jar"]
