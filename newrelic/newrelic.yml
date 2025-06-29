@@ -7,7 +7,6 @@
 # This section is for settings common to all environments.
 # Do not add anything above this next line.
 common: &default_settings
-
   # ============================== APP NAME ===============================
   # Set the name of your application as you'd like it to show up in the New Relic UI.
   # If enable_auto_app_naming is false, the agent reports all data to this application.
