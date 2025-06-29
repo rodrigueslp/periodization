@@ -12,7 +12,7 @@ COPY gradle ./gradle
 # COPY gradlew ./
 # RUN chmod +x ./gradlew
 
-# Se não tiver o gradlew, vamos usar o gradle instalado na imagem
+# Instala o Gradle (caso não tenha wrapper)
 RUN apk add --no-cache gradle
 
 # Copia o código fonte
@@ -21,11 +21,11 @@ COPY src ./src
 # Constrói a aplicação
 RUN gradle bootJar --no-daemon
 
-# Encontra o arquivo JAR gerado e o move para um local conhecido
+# Encontra o arquivo JAR gerado e move para um local conhecido
 RUN find /app/build/libs -name "*.jar" -exec mv {} /app/app.jar \; || echo "Jar not found"
 
-# Verifica se o JAR foi criado
-RUN ls -la /app/
+# Copia os arquivos do New Relic (jar e yml) para a imagem
+COPY newrelic/ /app/newrelic/
 
 # Cria diretório para armazenamento de arquivos
 RUN mkdir -p files
@@ -36,5 +36,8 @@ EXPOSE 8080
 # Define variável de ambiente específica do Railway para usar a porta atribuída
 ENV PORT=8080
 
-# Ponto de entrada para executar a aplicação
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+# Adiciona o New Relic Java agent ao comando de execução
+ENV JAVA_OPTS="-javaagent:/app/newrelic/newrelic.jar"
+
+# Ponto de entrada para executar a aplicação com o agente New Relic
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
