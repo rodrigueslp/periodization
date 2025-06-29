@@ -44,8 +44,6 @@ ENTRYPOINT ["/bin/sh", "-c", "\
   echo NEW_RELIC_LICENSE_KEY=$NEW_RELIC_LICENSE_KEY && \
   echo '===== newrelic-final.yml =====' && \
   cat /app/newrelic/newrelic-final.yml && \
-  echo '===== LOG DO NEW RELIC AGENT =====' && \
-  cat /app/newrelic/logs/newrelic_agent.log \
   echo '===== INICIANDO APLICAÇÃO =====' && \
   java -javaagent:/app/newrelic/newrelic.jar \
        -Dnewrelic.config.file=/app/newrelic/newrelic-final.yml \
