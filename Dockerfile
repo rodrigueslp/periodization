@@ -8,10 +8,6 @@ WORKDIR /app
 COPY build.gradle.kts settings.gradle.kts ./
 COPY gradle ./gradle
 
-# Se você tiver o gradlew no projeto, descomente a linha abaixo
-# COPY gradlew ./
-# RUN chmod +x ./gradlew
-
 # Instala o Gradle (caso não tenha wrapper)
 RUN apk add --no-cache gradle
 
@@ -21,23 +17,34 @@ COPY src ./src
 # Constrói a aplicação
 RUN gradle bootJar --no-daemon
 
-# Encontra o arquivo JAR gerado e move para um local conhecido
+# Move o .jar gerado para local conhecido
 RUN find /app/build/libs -name "*.jar" -exec mv {} /app/app.jar \; || echo "Jar not found"
 
-# Copia os arquivos do New Relic (jar e yml) para a imagem
+# Copia a pasta do New Relic (com o YAML contendo variáveis)
 COPY newrelic/ /app/newrelic/
 
-# Cria diretório para armazenamento de arquivos
+# Adiciona suporte ao comando `envsubst` para interpolar variáveis de ambiente
+RUN apk add --no-cache gettext
+
+# Cria diretório adicional (se necessário pela app)
 RUN mkdir -p files
 
-# Configuração de runtime
+# Exponha a porta (Railway define a PORT via env var)
 EXPOSE 8080
-
-# Define variável de ambiente específica do Railway para usar a porta atribuída
 ENV PORT=8080
 
-# Adiciona o New Relic Java agent ao comando de execução
-ENV JAVA_OPTS="-javaagent:/app/newrelic/newrelic.jar"
-
-# Ponto de entrada para executar a aplicação com o agente New Relic
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
+# Entrypoint com:
+# 1. Interpolação do newrelic.yml
+# 2. Prints no log para debug
+# 3. Execução da aplicação com o agente
+ENTRYPOINT ["/bin/sh", "-c", "\
+  echo 'Interpolando newrelic.yml com variáveis de ambiente...' && \
+  envsubst < /app/newrelic/newrelic.yml > /app/newrelic/newrelic-final.yml && \
+  echo '===== VARIÁVEIS DE AMBIENTE =====' && \
+  echo NEW_RELIC_LICENSE_KEY=$NEW_RELIC_LICENSE_KEY && \
+  echo '===== newrelic-final.yml =====' && \
+  cat /app/newrelic/newrelic-final.yml && \
+  echo '===== INICIANDO APLICAÇÃO =====' && \
+  java -javaagent:/app/newrelic/newrelic.jar \
+       -Dnewrelic.config.file=/app/newrelic/newrelic-final.yml \
+       -jar /app/app.jar"]
