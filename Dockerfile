@@ -35,11 +35,11 @@ COPY --from=builder /app/app.jar ./app.jar
 COPY --from=builder /app/newrelic ./newrelic
 
 # (Opcional) Copia o seu arquivo newrelic.yml com variáveis de ambiente
-COPY newrelic.yml ./newrelic/newrelic.yml
+COPY newrelic/newrelic.yml ./newrelic/newrelic.yml
 
 # Variáveis para New Relic (podem ser sobrescritas no Railway)
-#ENV NEW_RELIC_APP_NAME="PeriodizationApp"
-#ENV NEW_RELIC_LOG_LEVEL="info"
+ENV NEW_RELIC_APP_NAME="PeriodizationApp"
+ENV NEW_RELIC_LOG_LEVEL="info"
 
 # Exposição da porta
 EXPOSE 8080
