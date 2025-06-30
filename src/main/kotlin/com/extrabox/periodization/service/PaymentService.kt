@@ -4,10 +4,7 @@ import com.extrabox.periodization.entity.Payment
 import com.extrabox.periodization.enums.PlanStatus
 import com.extrabox.periodization.model.payment.PaymentRequest
 import com.extrabox.periodization.model.payment.PaymentResponse
-import com.extrabox.periodization.repository.PaymentRepository
-import com.extrabox.periodization.repository.StrengthTrainingPlanRepository
-import com.extrabox.periodization.repository.TrainingPlanRepository
-import com.extrabox.periodization.repository.UserRepository
+import com.extrabox.periodization.repository.*
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import okhttp3.MediaType.Companion.toMediaType
@@ -32,6 +29,7 @@ class PaymentService(
     private val paymentRepository: PaymentRepository,
     private val trainingPlanRepository: TrainingPlanRepository,
     private val strengthTrainingPlanRepository: StrengthTrainingPlanRepository,
+    private val runningTrainingPlanRepository: RunningTrainingPlanRepository,
     private val userService: UserService,
 
     @Value("\${mercado-pago.access-token}")
@@ -496,21 +494,43 @@ class PaymentService(
         }
     }
 
+
     @Transactional
     fun updatePlanStatus(planId: String, status: PlanStatus) {
         try {
+            // Primeiro tenta encontrar nos planos de CrossFit
             val trainingPlanOptional = trainingPlanRepository.findByPlanId(planId)
             if (trainingPlanOptional.isPresent) {
                 val trainingPlan = trainingPlanOptional.get()
                 trainingPlan.status = status
                 trainingPlanRepository.save(trainingPlan)
-            } else {
-                val strengthPlan = strengthTrainingPlanRepository.findByPlanId(planId)
-                    .orElseThrow { RuntimeException("Plano não encontrado com o ID: $planId") }
+                logger.info("Status do plano de CrossFit $planId atualizado para $status")
+                return
+            }
+
+            // Se não encontrou, tenta nos planos de musculação
+            val strengthPlanOptional = strengthTrainingPlanRepository.findByPlanId(planId)
+            if (strengthPlanOptional.isPresent) {
+                val strengthPlan = strengthPlanOptional.get()
                 strengthPlan.status = status
                 strengthTrainingPlanRepository.save(strengthPlan)
+                logger.info("Status do plano de musculação $planId atualizado para $status")
+                return
             }
-            logger.info("Status do plano $planId atualizado para $status")
+
+            // Se não encontrou, tenta nos planos de corrida
+            val runningPlanOptional = runningTrainingPlanRepository.findByPlanId(planId)
+            if (runningPlanOptional.isPresent) {
+                val runningPlan = runningPlanOptional.get()
+                runningPlan.status = status
+                runningTrainingPlanRepository.save(runningPlan)
+                logger.info("Status do plano de corrida $planId atualizado para $status")
+                return
+            }
+
+            // Se não encontrou em nenhum lugar, lança exceção
+            throw RuntimeException("Plano não encontrado com o ID: $planId")
+
         } catch (e: Exception) {
             logger.error("Erro ao atualizar status do plano $planId: ${e.message}", e)
             throw e
