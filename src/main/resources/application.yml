@@ -77,10 +77,10 @@ app:
   oauth2:
     redirectUri: ${OAUTH2_REDIRECT_URI}
   frontend-url: ${FRONT_URL}
+  backend-url: ${BACK_URL}
 
 mercado-pago:
   access-token: ${MERCADO_PAGO_TOKEN}
-
 
 logging:
   level:

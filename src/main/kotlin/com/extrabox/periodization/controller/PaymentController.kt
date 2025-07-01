@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.core.userdetails.UserDetails
+import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.web.bind.annotation.*
 
 @RestController
@@ -99,6 +100,27 @@ class PaymentController(
     ): ResponseEntity<Map<String, String>> {
         val status = paymentService.simulatePaymentApproval(externalReference, userDetails.username)
         return ResponseEntity.ok(mapOf("status" to status))
+    }
+
+    @GetMapping("/recovery/{planId}")
+    @Operation(summary = "Recuperar informações de pagamento de um plano")
+    @SecurityRequirement(name = "bearerAuth")
+    fun recoverPaymentInfo(
+        @PathVariable planId: String,
+        @AuthenticationPrincipal userDetails: UserDetails
+    ): ResponseEntity<PaymentResponse> {
+        return try {
+            val paymentInfo = paymentService.recoverPaymentInfo(planId, userDetails.username)
+            ResponseEntity.ok(paymentInfo)
+        } catch (e: UsernameNotFoundException) {
+            ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+        } catch (e: AccessDeniedException) {
+            ResponseEntity.status(HttpStatus.FORBIDDEN).build()
+        } catch (e: RuntimeException) {
+            ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+        } catch (e: Exception) {
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()
+        }
     }
 
 }
