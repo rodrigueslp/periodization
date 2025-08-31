@@ -1,5 +1,6 @@
 package com.extrabox.periodization.controller
 
+import org.slf4j.LoggerFactory
 import com.extrabox.periodization.model.PlanDetailsResponse
 import com.extrabox.periodization.model.PlanRequest
 import com.extrabox.periodization.model.PlanResponse
@@ -25,12 +26,16 @@ class PeriodizationController(
     private val periodizationService: PeriodizationService
 ) {
 
+    private val logger = LoggerFactory.getLogger(PeriodizationController::class.java)
+
+
     @PostMapping
     @Operation(summary = "Criar um plano pendente de pagamento", description = "Cria um plano pendente de pagamento baseado nos dados do atleta")
     fun createPendingPlan(
         @Valid @RequestBody request: PlanRequest,
         @AuthenticationPrincipal userDetails: UserDetails
     ): ResponseEntity<PlanResponse> {
+        logger.info("[CONTROLLER] Entered createPendingPlan(")
         val response = periodizationService.createPendingPlan(request, userDetails.username)
         return ResponseEntity.status(HttpStatus.CREATED).body(response)
     }
@@ -41,6 +46,7 @@ class PeriodizationController(
         @PathVariable planId: String,
         @AuthenticationPrincipal userDetails: UserDetails
     ): ResponseEntity<PlanResponse> {
+        logger.info("[CONTROLLER] Entered generateApprovedPlan(")
         val response = periodizationService.generateApprovedPlan(planId, userDetails.username)
         return ResponseEntity.status(HttpStatus.OK).body(response)
     }
@@ -51,6 +57,7 @@ class PeriodizationController(
         @Valid @RequestBody request: PlanRequest,
         @AuthenticationPrincipal userDetails: UserDetails
     ): ResponseEntity<PlanResponse> {
+        logger.info("[CONTROLLER] Entered generatePlan(")
         val response = periodizationService.generatePlan(request, userDetails.username)
         return ResponseEntity.status(HttpStatus.CREATED).body(response)
     }
@@ -61,6 +68,7 @@ class PeriodizationController(
         @PathVariable planId: String,
         @AuthenticationPrincipal userDetails: UserDetails
     ): ResponseEntity<ByteArray> {
+        logger.info("[CONTROLLER] Entered downloadPlan(")
         val excelData = periodizationService.getPlanExcel(planId, userDetails.username)
 
         val headers = HttpHeaders()
@@ -78,6 +86,7 @@ class PeriodizationController(
         @PathVariable planId: String,
         @AuthenticationPrincipal userDetails: UserDetails
     ): ResponseEntity<ByteArray> {
+        logger.info("[CONTROLLER] Entered downloadPlanPdf(")
         val pdfData = periodizationService.getPlanPdf(planId, userDetails.username)
 
         val headers = HttpHeaders()
@@ -95,6 +104,7 @@ class PeriodizationController(
         @PathVariable planId: String,
         @AuthenticationPrincipal userDetails: UserDetails
     ): ResponseEntity<PlanDetailsResponse> {
+        logger.info("[CONTROLLER] Entered getPlanDetails(")
         val planDetails = periodizationService.getPlanContent(planId, userDetails.username)
         return ResponseEntity.ok(planDetails)
     }
