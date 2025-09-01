@@ -16,10 +16,12 @@ class RabbitMQConfig {
         const val PLAN_GENERATION_CROSSFIT_QUEUE = "plan-generation-crossfit-queue"
         const val PLAN_GENERATION_STRENGTH_QUEUE = "plan-generation-strength-queue"
         const val PLAN_GENERATION_RUNNING_QUEUE = "plan-generation-running-queue"
+        const val PLAN_GENERATION_BIKE_QUEUE = "plan-generation-bike-queue"
 
         const val PLAN_GENERATION_CROSSFIT_ROUTING_KEY = "plan.crossfit.generate"
         const val PLAN_GENERATION_STRENGTH_ROUTING_KEY = "plan.strength.generate"
         const val PLAN_GENERATION_RUNNING_ROUTING_KEY = "plan.running.generate"
+        const val PLAN_GENERATION_BIKE_ROUTING_KEY = "plan.bike.generate"
     }
 
     @Bean
@@ -30,6 +32,9 @@ class RabbitMQConfig {
 
     @Bean
     fun runningQueue() = Queue(PLAN_GENERATION_RUNNING_QUEUE)
+
+    @Bean
+    fun bikeQueue() = Queue(PLAN_GENERATION_BIKE_QUEUE)
 
     @Bean
     fun planExchange() = TopicExchange(PLAN_GENERATION_EXCHANGE)
@@ -48,6 +53,11 @@ class RabbitMQConfig {
     fun bindRunning() = BindingBuilder.bind(runningQueue())
         .to(planExchange())
         .with(PLAN_GENERATION_RUNNING_ROUTING_KEY)
+
+    @Bean
+    fun bindBike() = BindingBuilder.bind(bikeQueue())
+        .to(planExchange())
+        .with(PLAN_GENERATION_BIKE_ROUTING_KEY)
 
     @Bean
     fun jsonMessageConverter(): Jackson2JsonMessageConverter {

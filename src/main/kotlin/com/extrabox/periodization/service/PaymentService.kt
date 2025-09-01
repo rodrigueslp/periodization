@@ -30,6 +30,7 @@ class PaymentService(
     private val trainingPlanRepository: TrainingPlanRepository,
     private val strengthTrainingPlanRepository: StrengthTrainingPlanRepository,
     private val runningTrainingPlanRepository: RunningTrainingPlanRepository,
+    private val bikeTrainingPlanRepository: BikeTrainingPlanRepository,
     private val userService: UserService,
 
     @Value("\${mercado-pago.access-token}")
@@ -552,6 +553,16 @@ class PaymentService(
                 runningPlan.status = status
                 runningTrainingPlanRepository.save(runningPlan)
                 logger.info("Status do plano de corrida $planId atualizado para $status")
+                return
+            }
+
+            // Se não encontrou, tenta nos planos de bike
+            val bikePlanOptional = bikeTrainingPlanRepository.findByPlanId(planId)
+            if (bikePlanOptional.isPresent) {
+                val bikePlan = bikePlanOptional.get()
+                bikePlan.status = status
+                bikeTrainingPlanRepository.save(bikePlan)
+                logger.info("Status do plano de bike $planId atualizado para $status")
                 return
             }
 
