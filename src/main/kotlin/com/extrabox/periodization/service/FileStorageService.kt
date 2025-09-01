@@ -97,4 +97,37 @@ class FileStorageService {
             throw RuntimeException("Falha ao carregar o arquivo PDF", e)
         }
     }
+
+    /**
+     * Lê um arquivo pelo caminho completo
+     */
+    fun readFile(filePath: String): ByteArray {
+        try {
+            val path = Paths.get(filePath)
+            if (!Files.exists(path)) {
+                throw RuntimeException("Arquivo não encontrado: $filePath")
+            }
+            return Files.readAllBytes(path)
+        } catch (e: IOException) {
+            logger.error("Falha ao ler o arquivo: $filePath", e)
+            throw RuntimeException("Falha ao ler o arquivo: $filePath", e)
+        }
+    }
+
+    /**
+     * Salva um arquivo com nome e dados fornecidos
+     */
+    fun saveFileWithName(data: ByteArray, fileName: String): String {
+        try {
+            val filePath = Paths.get(storageDirectoryPath, fileName)
+            FileOutputStream(filePath.toFile()).use { outputStream ->
+                outputStream.write(data)
+            }
+            logger.info("Arquivo salvo com sucesso: {}", filePath)
+            return filePath.toString()
+        } catch (e: IOException) {
+            logger.error("Falha ao salvar o arquivo: $fileName", e)
+            throw RuntimeException("Falha ao salvar o arquivo: $fileName", e)
+        }
+    }
 }

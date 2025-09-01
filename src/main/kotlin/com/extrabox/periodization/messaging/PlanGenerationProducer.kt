@@ -21,6 +21,7 @@ class PlanGenerationProducer(
             PlanType.CROSSFIT -> RabbitMQConfig.PLAN_GENERATION_CROSSFIT_ROUTING_KEY to RabbitMQConfig.PLAN_GENERATION_CROSSFIT_QUEUE
             PlanType.STRENGTH -> RabbitMQConfig.PLAN_GENERATION_STRENGTH_ROUTING_KEY to RabbitMQConfig.PLAN_GENERATION_STRENGTH_QUEUE
             PlanType.RUNNING -> RabbitMQConfig.PLAN_GENERATION_RUNNING_ROUTING_KEY to RabbitMQConfig.PLAN_GENERATION_RUNNING_QUEUE
+            PlanType.BIKE -> RabbitMQConfig.PLAN_GENERATION_BIKE_ROUTING_KEY to RabbitMQConfig.PLAN_GENERATION_BIKE_QUEUE
         }
 
         rabbitTemplate.convertAndSend(
