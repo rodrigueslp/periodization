@@ -1,6 +1,5 @@
 package com.extrabox.periodization.service
 
-import com.newrelic.api.agent.Trace
 import org.slf4j.LoggerFactory
 import com.extrabox.periodization.entity.BenchmarkData
 import com.extrabox.periodization.enums.PlanStatus
@@ -36,7 +35,6 @@ class PeriodizationService(
      * Cria um novo plano sem conteúdo, apenas com os dados básicos do atleta e status PAYMENT_PENDING
      */
     @Transactional
-    @Trace
     fun createPendingPlan(request: PlanRequest, userEmail: String): PlanResponse {
         logger.info("[SERVICE] Entered createPendingPlan(request:")
         // Verificar se o usuário existe
@@ -121,7 +119,6 @@ class PeriodizationService(
      * Inicia a geração assíncrona de um plano que já foi aprovado para pagamento
      */
     @Transactional
-    @Trace
     fun generateApprovedPlan(planId: String, userEmail: String): PlanResponse {
         logger.info("[SERVICE] Entered generateApprovedPlan(planId:")
         // Verificar se o usuário existe
@@ -169,7 +166,6 @@ class PeriodizationService(
      * Método legado para compatibilidade - agora divide o processo em duas etapas
      */
     @Transactional
-    @Trace
     fun generatePlan(request: PlanRequest, userEmail: String): PlanResponse {
         logger.info("[SERVICE] Entered generatePlan(request:")
         // Verificar se o usuário existe
@@ -196,7 +192,6 @@ class PeriodizationService(
         return generateApprovedPlan(planId, userEmail)
     }
 
-    @Trace
     fun getPlanExcel(planId: String, userEmail: String): ByteArray {
         logger.info("[SERVICE] Entered getPlanExcel(planId:")
         val trainingPlan = trainingPlanRepository.findByPlanId(planId)
@@ -213,7 +208,6 @@ class PeriodizationService(
         return fileStorageService.loadFile(planId)
     }
 
-    @Trace
     fun getPlanContent(planId: String, userEmail: String): PlanDetailsResponse {
         logger.info("[SERVICE] Entered getPlanContent(planId:")
         val trainingPlan = trainingPlanRepository.findByPlanId(planId)
@@ -272,7 +266,6 @@ class PeriodizationService(
         )
     }
 
-    @Trace
     fun getPlanPdf(planId: String, userEmail: String): ByteArray {
         logger.info("[SERVICE] Entered getPlanPdf(planId:")
         val trainingPlan = trainingPlanRepository.findByPlanId(planId)
@@ -339,7 +332,6 @@ class PeriodizationService(
         }
     }
 
-    @Trace
     fun getUserPlans(userEmail: String): List<PlanDetailsResponse> {
         logger.info("[SERVICE] Entered getUserPlans(userEmail:")
         val user = userRepository.findByEmail(userEmail)
